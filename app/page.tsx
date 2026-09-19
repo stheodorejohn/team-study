@@ -9,14 +9,14 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* ── Hero ── */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 text-center">
         {/* Icon */}
-        <div className="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-indigo-600/20 border border-indigo-500/30">
+        <div className="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-indigo-100 border border-indigo-200">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-9 w-9 text-indigo-400"
+            className="h-9 w-9 text-indigo-600"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -31,14 +31,14 @@ export default function HomePage() {
           </svg>
         </div>
 
-        <h1 className="text-4xl sm:text-5xl font-bold text-gray-100 tracking-tight max-w-2xl">
+        <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight max-w-2xl">
           Study Guide{' '}
-          <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
             Architect
           </span>
         </h1>
 
-        <p className="mt-4 text-lg text-gray-400 max-w-xl leading-relaxed">
+        <p className="mt-4 text-lg text-gray-600 max-w-xl leading-relaxed">
           Build interactive, QR-linked study guides that students open on their
           phone, fill in, and print as a PDF — no app install required.
         </p>
@@ -76,7 +76,7 @@ export default function HomePage() {
           ].map((feat) => (
             <span
               key={feat}
-              className="rounded-full border border-gray-800 bg-gray-900 px-4 py-1.5 text-sm text-gray-400"
+              className="rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm text-gray-600"
             >
               {feat}
             </span>
@@ -85,7 +85,7 @@ export default function HomePage() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="py-6 text-center text-xs text-gray-700">
+      <footer className="py-6 text-center text-xs text-gray-500">
         Fellowship Study · Study Guide Architect
       </footer>
     </div>

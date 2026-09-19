@@ -166,7 +166,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>(
     <div
       ref={ref}
       data-density={density}
-      className={`relative overflow-x-hidden overflow-y-auto ${isDark ? 'bg-gray-900' : 'bg-white'}`}
+      className={`relative overflow-x-hidden overflow-y-auto touch-pan-y ${isDark ? 'bg-gray-900' : 'bg-white'}`}
       // overflow-x-hidden clips page content horizontally (prevents visual bleed),
       // overflow-y-auto lets the page scroll vertically when font is large.
       // This is a CSS class rule — survives the library's style.cssText rewrites
@@ -300,6 +300,50 @@ function SectionHeaderContent({
 }
 
 
+// ─── Auto-expanding textarea ──────────────────────────────────────────────────
+
+function AutoTextarea({
+  defaultValue,
+  placeholder,
+  onChange,
+  className
+}: {
+  defaultValue: string
+  placeholder: string
+  onChange: (v: string) => void
+  className: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+    onChange(el.value)
+  }
+
+  // Initial resize
+  useEffect(() => {
+    const el = ref.current
+    if (el) {
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+  }, [])
+
+  return (
+    <textarea
+      ref={ref}
+      defaultValue={defaultValue}
+      placeholder={placeholder}
+      rows={3}
+      onChange={handleChange}
+      className={className}
+      style={{ overflow: 'hidden', resize: 'none' }}
+    />
+  )
+}
+
 function QuestionInput({
   question,
   answersRef,
@@ -313,10 +357,11 @@ function QuestionInput({
   onCheckboxToggle: (id: string, opt: string, checked: boolean) => void
   isDark?: boolean
 }) {
-  // font-size: 1em ensures inputs inherit the page's font-size and scale with A+/A−
+  // font-size: max(16px, 1em) prevents iOS Safari from zooming in on focus when 1em < 16px,
+  // while still allowing the input to scale up with the page's font-size if A+ is clicked.
   const base = isDark
-    ? 'w-full rounded border border-gray-700 bg-gray-800 px-2 py-1.5 [font-size:1em] text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition'
-    : 'w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 [font-size:1em] text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition'
+    ? 'w-full rounded border border-gray-700 bg-gray-800 px-2 py-1.5 text-[max(16px,1em)] text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition'
+    : 'w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-[max(16px,1em)] text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition'
 
   // Attach native listeners to stop propagation at DOM level before page-flip gets it.
   // 'touchmove' and 'wheel' are critical: without them the library intercepts vertical
@@ -346,12 +391,11 @@ function QuestionInput({
         style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
       >
         {(question.type === 'text' || question.type === 'textarea') && (
-          <textarea
+          <AutoTextarea
             defaultValue={(answersRef.current[question.id] as string) ?? ''}
             placeholder="Answer…"
-            rows={3}
-            onChange={(e) => onStringAnswer(question.id, e.target.value)}
-            className={`${base} min-h-[72px] resize-y`}
+            onChange={(v) => onStringAnswer(question.id, v)}
+            className={`${base} min-h-[72px]`}
           />
         )}
 
@@ -428,22 +472,22 @@ function QuestionsPageContent({
   }, [])
 
   return (
-    <div className="h-full flex flex-col px-5 py-4">
-      {/* Mini section header */}
-      <div className={`flex flex-wrap items-start gap-x-2 gap-y-0.5 mb-3 flex-shrink-0 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
-        <div className="h-2.5 w-2.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: color }} />
+    <div ref={questionsScrollRef} className="flex flex-col px-5 py-4 pb-12">
+      {/* Mini section header (scrolls with page) */}
+      <div className={`flex flex-wrap items-start gap-x-2 gap-y-0.5 mb-3 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
+        <div className="h-2.5 w-2.5 rounded-full mt-0.5 shrink-0" style={{ background: color }} />
         <span style={{ fontSize: '0.65em' }} className={`font-semibold uppercase tracking-wider break-words flex-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
           {section.title}
         </span>
         {totalParts > 1 && (
-          <span style={{ fontSize: '0.65em' }} className={`ml-auto flex-shrink-0 ${isDark ? 'text-gray-600' : 'text-gray-300'}`}>
+          <span style={{ fontSize: '0.65em' }} className={`ml-auto shrink-0 ${isDark ? 'text-gray-600' : 'text-gray-300'}`}>
             {partNum}/{totalParts}
           </span>
         )}
       </div>
 
-      {/* Questions — ref isolates touch/wheel from the page-flip drag listener */}
-      <div ref={questionsScrollRef} className="flex-1 space-y-4 overflow-y-auto pr-1 overscroll-contain">
+      {/* Questions list */}
+      <div className="space-y-4">
         {questions.map((q) => (
           <QuestionInput
             key={q.id}
@@ -515,6 +559,21 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
   // Measured available size for the flipbook (stage content area, inside 10px padding)
   const [bookSize, setBookSize] = useState({ width: 320, height: 480 })
   const stageRef = useRef<HTMLDivElement>(null)
+
+  // Track a stable layout height that doesn't shrink when virtual keyboard opens
+  const [stableLayout, setStableLayout] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    setStableLayout((prev) => {
+      if (prev.width === 0) return { width: bookSize.width, height: bookSize.height }
+      // If width changed significantly (e.g. orientation change or window resize)
+      if (Math.abs(prev.width - bookSize.width) > 10) return { width: bookSize.width, height: bookSize.height }
+      // If height increased, update it
+      if (bookSize.height > prev.height) return { width: prev.width, height: bookSize.height }
+      // Otherwise keep old height to avoid reflow when keyboard pops up
+      return prev
+    })
+  }, [bookSize])
 
   // ── Responsive layout: 1-page vs 2-page spread ──
   // Show a two-page book spread when the device is in landscape AND wide enough
@@ -658,7 +717,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     const PADDING_BOTTOM = 16
     const GAP = 16  // space-y-4
     const SAFETY = 8   // a little breathing room
-    const available = bookSize.height - PADDING_TOP - HEADER_HEIGHT - PADDING_BOTTOM - SAFETY
+    const available = (stableLayout.height || bookSize.height) - PADDING_TOP - HEADER_HEIGHT - PADDING_BOTTOM - SAFETY
 
     let cumulative = 0
     let count = 0
@@ -673,7 +732,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     // questionsKey is a stable string (joined IDs) — keeps the deps array at a
     // constant size of 3, which React requires for hooks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookSize, fontSize, questionsKey])
+  }, [stableLayout.height, bookSize.height, fontSize, questionsKey])
 
   // The page-flip library calls `element.style.cssText = '...'` on every animation
   // frame (HTMLPage.simpleDraw, drawSoft, drawHard, and clear in HTMLRender).
@@ -1279,7 +1338,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
         {/* ── Book stage ── */}
         <div
           ref={stageRef}
-          className="relative flex-1 flex flex-col items-center justify-center overflow-hidden print:hidden p-[10px]"
+          className="relative flex-1 flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden print:hidden p-[10px]"
         >
 
           {mounted ? (
@@ -1287,7 +1346,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
               ref={bookRef}
               width={pageWidth}
               height={bookSize.height}
-              size="stretch"
+              size="fixed"
               minWidth={220}
               maxWidth={pageWidth}
               minHeight={320}
@@ -1298,15 +1357,15 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
               showCover={true}
               mobileScrollSupport={true}
               clickEventForward={false}
-              useMouseEvents={true}
-              showPageCorners={true}
+              useMouseEvents={false}
+              showPageCorners={false}
               disableFlipByClick={true}
               maxShadowOpacity={0.4}
               className="shadow-2xl"
               style={{}}
               startPage={0}
               startZIndex={0}
-              autoSize
+              autoSize={false}
               swipeDistance={60}
               renderOnlyPageLengthChange={true}
               onFlip={(e) => setCurrentPage(e.data)}
