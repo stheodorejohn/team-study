@@ -4,7 +4,7 @@ import type { StudyMaterial } from '@/lib/supabase'
 import { BookWrapper } from './BookWrapper'
 import type { Metadata } from 'next'
 
-export const dynamic_export = 'force-dynamic'
+export const dynamic = 'force-dynamic'
 
 async function getStudyMaterial(slug: string): Promise<StudyMaterial | null> {
   try {

@@ -17,11 +17,11 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { QRCodeSVG } from 'qrcode.react'
+import { QRCodeCanvas } from 'qrcode.react'
 import {
   Plus, Trash2, Save, ChevronLeft, ChevronRight,
   Copy, CheckCheck, ExternalLink, GripVertical,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Download,
 } from 'lucide-react'
 import type { StudyMaterial, QuestionType } from '@/lib/supabase'
 
@@ -441,6 +441,16 @@ export function EditorClient({ id, isNew, initialData }: EditorClientProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function downloadQR() {
+    const canvas = document.getElementById('qr-editor') as HTMLCanvasElement
+    if (!canvas) return
+    const url = canvas.toDataURL('image/png')
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${draft.slug || 'qr'}-qr.png`
+    link.click()
+  }
+
   const activeSection = draft.sections[activeSectionIdx] ?? draft.sections[0]
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -636,7 +646,7 @@ export function EditorClient({ id, isNew, initialData }: EditorClientProps) {
             <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500">QR Code</h2>
             <div className="flex gap-4 items-start">
               <div className="rounded-xl bg-white p-2 flex-shrink-0">
-                <QRCodeSVG value={qrUrl} size={88} level="M" aria-label={`QR for ${qrUrl}`} />
+                <QRCodeCanvas id="qr-editor" value={qrUrl} size={88} level="M" aria-label={`QR for ${qrUrl}`} />
               </div>
               <div className="flex-1 min-w-0 space-y-2">
                 <p className="text-xs text-gray-500 break-all font-mono">{qrUrl}</p>
@@ -659,6 +669,13 @@ export function EditorClient({ id, isNew, initialData }: EditorClientProps) {
                   >
                     <ExternalLink className="h-3.5 w-3.5" /> Open
                   </a>
+                  <button
+                    type="button"
+                    onClick={downloadQR}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-gray-800 hover:bg-gray-700 px-2.5 py-1.5 text-xs text-gray-300 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download
+                  </button>
                 </div>
               </div>
             </div>

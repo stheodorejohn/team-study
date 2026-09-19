@@ -32,8 +32,8 @@ import {
   Maximize,
   X,
   Settings,
-  Sun,
-  Moon,
+  // Sun,
+  // Moon,
 } from 'lucide-react'
 import type { StudyMaterial, StudySection, Question } from '@/lib/supabase'
 import { ScriptureModal } from '@/components/ScriptureModal'
@@ -158,14 +158,15 @@ interface PageProps {
   pageNum?: number
   totalPages?: number
   density?: 'hard' | 'soft'
+  isDark?: boolean
 }
 
 const Page = forwardRef<HTMLDivElement, PageProps>(
-  ({ children, pageNum, totalPages, density = 'soft' }, ref) => (
+  ({ children, pageNum, totalPages, density = 'soft', isDark = false }, ref) => (
     <div
       ref={ref}
       data-density={density}
-      className="relative bg-white overflow-x-hidden overflow-y-auto"
+      className={`relative overflow-x-hidden overflow-y-auto ${isDark ? 'bg-gray-900' : 'bg-white'}`}
       // overflow-x-hidden clips page content horizontally (prevents visual bleed),
       // overflow-y-auto lets the page scroll vertically when font is large.
       // This is a CSS class rule — survives the library's style.cssText rewrites
@@ -175,7 +176,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>(
       {children}
       {/* Page number footer */}
       {pageNum !== undefined && (
-        <div style={{ fontSize: '0.65em' }} className="absolute bottom-2 inset-x-0 text-center text-gray-300 pointer-events-none">
+        <div style={{ fontSize: '0.65em' }} className={`absolute bottom-2 inset-x-0 text-center pointer-events-none ${isDark ? 'text-gray-600' : 'text-gray-300'}`}>
           {pageNum} / {totalPages}
         </div>
       )}
@@ -236,11 +237,13 @@ function SectionHeaderContent({
   sectionIdx,
   total,
   onOpenModal,
+  isDark = false,
 }: {
   section: StudySection
   sectionIdx: number
   total: number
   onOpenModal: () => void
+  isDark?: boolean
 }) {
   const color = accent(sectionIdx)
   const hasPassage = !!(section.scripture_reference || section.scripture_text || section.summary)
@@ -258,18 +261,18 @@ function SectionHeaderContent({
         >
           Section {sectionIdx + 1} of {total}
         </span>
-        <h2 style={{ fontSize: '1.25em' }} className="font-extrabold text-gray-900 leading-tight">
+        <h2 style={{ fontSize: '1.25em' }} className={`font-extrabold leading-tight ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
           {section.title}
         </h2>
         {section.scripture_reference && (
-          <p style={{ fontSize: '0.75em' }} className="text-gray-500 italic mt-1">{section.scripture_reference}</p>
+          <p style={{ fontSize: '0.75em' }} className={`italic mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{section.scripture_reference}</p>
         )}
       </div>
 
       {/* Body */}
       <div className="flex-1 px-6 py-5 flex flex-col gap-4">
         {section.summary && (
-          <p style={{ fontSize: '0.75em' }} className="text-gray-600 leading-relaxed">{section.summary}</p>
+          <p style={{ fontSize: '0.75em' }} className={`leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{section.summary}</p>
         )}
 
         {hasPassage && (
@@ -284,7 +287,7 @@ function SectionHeaderContent({
         )}
 
         <div className="flex-1 flex items-end">
-          <p style={{ fontSize: '0.75em' }} className="text-gray-400 italic">
+          <p style={{ fontSize: '0.75em' }} className={`italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
             Turn the page to begin answering →
           </p>
         </div>
@@ -302,15 +305,18 @@ function QuestionInput({
   answersRef,
   onStringAnswer,
   onCheckboxToggle,
+  isDark = false,
 }: {
   question: Question
   answersRef: React.MutableRefObject<AnswerMap>
   onStringAnswer: (id: string, v: string) => void
   onCheckboxToggle: (id: string, opt: string, checked: boolean) => void
+  isDark?: boolean
 }) {
   // font-size: 1em ensures inputs inherit the page's font-size and scale with A+/A−
-  const base =
-    'w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 [font-size:1em] text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition'
+  const base = isDark
+    ? 'w-full rounded border border-gray-700 bg-gray-800 px-2 py-1.5 [font-size:1em] text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition'
+    : 'w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 [font-size:1em] text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition'
 
   // Attach native listeners to stop propagation at DOM level before page-flip gets it.
   // 'touchmove' and 'wheel' are critical: without them the library intercepts vertical
@@ -330,7 +336,7 @@ function QuestionInput({
 
   return (
     <div className="space-y-1">
-      <label style={{ fontSize: '0.9em' }} className="block font-medium text-gray-700 leading-snug">
+      <label style={{ fontSize: '0.9em' }} className={`block font-medium leading-snug ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
         {question.prompt}
         {question.is_required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
@@ -361,7 +367,7 @@ function QuestionInput({
                   onChange={() => onStringAnswer(question.id, opt)}
                   className="h-3 w-3 text-indigo-600"
                 />
-                <span className="text-xs text-gray-600">{opt}</span>
+                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{opt}</span>
               </label>
             ))}
           </div>
@@ -378,7 +384,7 @@ function QuestionInput({
                   onChange={(e) => onCheckboxToggle(question.id, opt, e.target.checked)}
                   className="h-3 w-3 rounded text-indigo-600"
                 />
-                <span className="text-xs text-gray-600">{opt}</span>
+                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{opt}</span>
               </label>
             ))}
           </div>
@@ -397,6 +403,7 @@ function QuestionsPageContent({
   answersRef,
   onStringAnswer,
   onCheckboxToggle,
+  isDark = false,
 }: {
   section: StudySection
   sectionIdx: number
@@ -406,6 +413,7 @@ function QuestionsPageContent({
   answersRef: React.MutableRefObject<AnswerMap>
   onStringAnswer: (id: string, v: string) => void
   onCheckboxToggle: (id: string, opt: string, checked: boolean) => void
+  isDark?: boolean
 }) {
   const color = accent(sectionIdx)
 
@@ -422,13 +430,13 @@ function QuestionsPageContent({
   return (
     <div className="h-full flex flex-col px-5 py-4">
       {/* Mini section header */}
-      <div className="flex flex-wrap items-start gap-x-2 gap-y-0.5 mb-3 flex-shrink-0 pb-2 border-b border-gray-100">
+      <div className={`flex flex-wrap items-start gap-x-2 gap-y-0.5 mb-3 flex-shrink-0 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
         <div className="h-2.5 w-2.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: color }} />
-        <span style={{ fontSize: '0.65em' }} className="font-semibold text-gray-400 uppercase tracking-wider break-words flex-1">
+        <span style={{ fontSize: '0.65em' }} className={`font-semibold uppercase tracking-wider break-words flex-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
           {section.title}
         </span>
         {totalParts > 1 && (
-          <span style={{ fontSize: '0.65em' }} className="ml-auto text-gray-300 flex-shrink-0">
+          <span style={{ fontSize: '0.65em' }} className={`ml-auto flex-shrink-0 ${isDark ? 'text-gray-600' : 'text-gray-300'}`}>
             {partNum}/{totalParts}
           </span>
         )}
@@ -443,6 +451,7 @@ function QuestionsPageContent({
             answersRef={answersRef}
             onStringAnswer={onStringAnswer}
             onCheckboxToggle={onCheckboxToggle}
+            isDark={isDark}
           />
         ))}
       </div>
@@ -487,12 +496,13 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
   const [mounted, setMounted] = useState(false)
 
   // ── Theme: read system preference, fall back to dark ──
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === 'undefined') return true
-    const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
-    // If media query is not supported, default to dark
-    return mq ? mq.matches : true
-  })
+  // const [isDark, setIsDark] = useState(() => {
+  //   if (typeof window === 'undefined') return true
+  //   const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
+  //   // If media query is not supported, default to dark
+  //   return mq ? mq.matches : true
+  // })
+  const isDark = false; // Hardcoded to light mode for now
 
   // ── Customize panel (mobile inline toolbar) ──
   const [customizeOpen, setCustomizeOpen] = useState(false)
@@ -512,7 +522,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
   // typically under ~650px stage width, so they stay in single-page mode and
   // simply stretch to fill the full available width.
   const isLandscape = bookSize.width > bookSize.height
-  const showTwoPages = isLandscape && bookSize.width >= 800
+  const showTwoPages = isLandscape
   // pageWidth is the width of a single page. In two-page mode react-pageflip
   // renders the full spread as 2 × pageWidth.
   const pageWidth = showTwoPages ? Math.floor(bookSize.width / 2) : bookSize.width
@@ -681,8 +691,9 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
       tag.id = styleId
       document.head.appendChild(tag)
     }
-    tag.textContent = `.stf__item { font-size: ${fontSize}px !important; }`
-  }, [fontSize])
+    const bg = isDark ? '#111827' : '#ffffff' // gray-900 : white
+    tag.textContent = `.stf__item { font-size: ${fontSize}px !important; background: ${bg} !important; }`
+  }, [fontSize, isDark])
 
   // ── Rehydrate answers from localStorage ──
   useEffect(() => {
@@ -799,6 +810,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
             sectionIdx={page.sectionIdx}
             total={page.total}
             onOpenModal={() => setModalSection(page.section)}
+            isDark={isDark}
           />
         )
       case 'questions':
@@ -812,10 +824,11 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
             answersRef={answersRef}
             onStringAnswer={handleStringAnswer}
             onCheckboxToggle={handleCheckboxToggle}
+            isDark={isDark}
           />
         )
       case 'blank':
-        return <div className="h-full bg-white" />
+        return <div className={`h-full ${isDark ? 'bg-gray-900' : 'bg-white'}`} />
       case 'back':
         return <BackContent material={page.material} />
       default:
@@ -911,14 +924,41 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
 </body>
 </html>`
 
-    const win = window.open('', '_blank')
-    if (!win) return
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    document.body.appendChild(iframe)
+    
+    const win = iframe.contentWindow
+    if (!win) {
+      document.body.removeChild(iframe)
+      return
+    }
+    
     win.document.open()
     win.document.write(html)
     win.document.close()
-    win.focus()
+    
+    // Clean up after print dialog is closed (or cancelled)
+    // Most modern browsers support afterprint on the iframe's window
+    win.addEventListener('afterprint', () => {
+      // Need a small timeout to ensure the print process is completely finished
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe)
+        }
+      }, 100)
+    })
+    
     // Small delay so the browser finishes painting before print dialog
-    setTimeout(() => { win.print() }, 400)
+    setTimeout(() => { 
+      win.focus()
+      win.print() 
+    }, 400)
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1023,7 +1063,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
               <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
 
               {/* Light / Dark theme toggle */}
-              <div className={`flex h-10 rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              {/* <div className={`flex h-10 rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
                 <button
                   type="button"
                   onClick={() => setIsDark(false)}
@@ -1044,7 +1084,8 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
                 </button>
               </div>
 
-              <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+              <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} /> */}
+
             </div>
 
             {/* ── Mobile-only Style gear (md:hidden) ── */}
@@ -1131,7 +1172,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
               <div className="flex-1" />
 
               {/* Light / Dark toggle */}
-              <div className={`flex rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              {/* <div className={`flex rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
                 <button
                   type="button"
                   onClick={() => setIsDark(false)}
@@ -1146,7 +1187,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
                 >
                   <Moon className="h-3.5 w-3.5" /> Dark
                 </button>
-              </div>
+              </div> */}
             </div>
 
             {/* ── Row 2: Actions ── */}
@@ -1280,6 +1321,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
                     density="soft"
                     pageNum={showNum ? idx : undefined}
                     totalPages={totalPages}
+                    isDark={isDark}
                   >
                     {renderPageContent(page)}
                   </Page>
@@ -1345,23 +1387,31 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
               role="alertdialog"
               aria-modal="true"
               aria-labelledby="reset-confirm-heading"
-              className="relative z-10 w-full rounded-t-2xl bg-white border-t border-x border-gray-200 shadow-2xl px-5 pt-4 pb-8"
+              className={`relative z-10 w-full rounded-t-2xl border-t border-x shadow-2xl px-5 pt-4 pb-8 ${
+                isDark
+                  ? 'bg-gray-900 border-gray-700'
+                  : 'bg-white border-gray-200'
+              }`}
               style={{ animation: 'slideUp 300ms cubic-bezier(0.22,1,0.36,1) both' }}
             >
               <div className="flex justify-center mb-4" aria-hidden="true">
-                <div className="h-1 w-10 rounded-full bg-gray-300" />
+                <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
               </div>
               <div className="flex items-start gap-3 mb-3">
-                <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-red-50 border border-red-200">
+                <div className={`flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full border ${
+                  isDark ? 'bg-red-950/40 border-red-800' : 'bg-red-50 border-red-200'
+                }`}>
                   <RotateCcw className="h-5 w-5 text-red-500" />
                 </div>
                 <div>
-                  <h2 id="reset-confirm-heading" className="text-base font-bold text-gray-900">Reset all answers?</h2>
-                  <p className="text-sm text-gray-500 mt-1">This will permanently clear every answer you have entered for this study guide. This cannot be undone.</p>
+                  <h2 id="reset-confirm-heading" className={`text-base font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Reset all answers?</h2>
+                  <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This will permanently clear every answer you have entered for this study guide. This cannot be undone.</p>
                 </div>
               </div>
               <div className="flex gap-3 mt-5">
-                <button type="button" onClick={() => setResetConfirmOpen(false)} className="flex-1 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 py-3 text-sm font-semibold text-gray-600 transition-colors">Cancel</button>
+                <button type="button" onClick={() => setResetConfirmOpen(false)} className={`flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors ${
+                  isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'
+                }`}>Cancel</button>
                 <button type="button" onClick={doResetAnswers} className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 py-3 text-sm font-semibold text-white transition-colors">Yes, reset</button>
               </div>
             </div>

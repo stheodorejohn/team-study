@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { QRCodeSVG } from 'qrcode.react'
+import { QRCodeCanvas } from 'qrcode.react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -24,6 +24,7 @@ import {
   CheckCheck,
   BookOpen,
   PlusCircle,
+  Download,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,6 +85,16 @@ function GuideCard({
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function downloadQR() {
+    const canvas = document.getElementById(`qr-${guide.slug}`) as HTMLCanvasElement
+    if (!canvas) return
+    const url = canvas.toDataURL('image/png')
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${guide.slug}-qr.png`
+    link.click()
+  }
+
   return (
     <div className="h-full w-full flex items-center justify-center p-4 sm:p-8">
       <div
@@ -121,7 +132,8 @@ function GuideCard({
           {/* QR code */}
           <div className="flex items-start gap-6">
             <div className="flex-shrink-0 rounded-2xl bg-white p-3 shadow-lg">
-              <QRCodeSVG
+              <QRCodeCanvas
+                id={`qr-${guide.slug}`}
                 value={publicUrl}
                 size={96}
                 level="M"
@@ -180,6 +192,15 @@ function GuideCard({
                   Copy link
                 </>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={downloadQR}
+              className="inline-flex items-center gap-2 rounded-xl bg-gray-800 hover:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-200 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download
             </button>
           </div>
         </div>
