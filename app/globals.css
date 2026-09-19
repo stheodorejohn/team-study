@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ─── Base styles ────────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Print / PDF overrides ──────────────────────────────────────────────── */
+/*
+ * When the user clicks "Print / Save as PDF" inside the flipbook viewer:
+ * 1. Hide all interactive UI chrome (nav bars, buttons, dot indicators).
+ * 2. Force a white, full-bleed page background.
+ * 3. Give each PageCard its own printed page.
+ * 4. Ensure form controls render legibly on paper.
+ */
+@media print {
+  /* Reset page margins and force white background */
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm;
+  }
+
+  /* Hide everything by default, then reveal only print-safe content */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  /* Hide all interactive chrome */
+  header,
+  nav,
+  footer,
+  button,
+  [aria-label="Page navigation"],
+  [aria-label="Study guide pages"] {
+    display: none !important;
+  }
+
+  /* Each study guide page starts on its own printed page */
+  .print-page,
+  article[aria-label^="Page"] {
+    page-break-before: always;
+    break-before: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    background: white !important;
+  }
+
+  /* First page shouldn't force a break */
+  article[aria-label^="Page"]:first-child {
+    page-break-before: auto;
+    break-before: auto;
+  }
+
+  /* Form fields: remove backgrounds/shadows, show borders clearly */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  textarea,
+  select {
+    border: 1px solid #999 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Expand textareas to show full content */
+  textarea {
+    height: auto !important;
+    min-height: 4em;
+    overflow: visible !important;
+    resize: none !important;
+  }
+
+  /* Checkboxes: ensure they render */
+  input[type="checkbox"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    width: 12pt;
+    height: 12pt;
+  }
+
+  /* Typography adjustments */
+  h1, h2, h3 {
+    orphans: 3;
+    widows: 3;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  p, li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Accent colours must survive print */
+  .text-indigo-500,
+  .text-indigo-600 {
+    color: #4f46e5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
