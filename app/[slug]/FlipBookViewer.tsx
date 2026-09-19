@@ -393,7 +393,7 @@ function QuestionInput({
         {(question.type === 'text' || question.type === 'textarea') && (
           <AutoTextarea
             defaultValue={(answersRef.current[question.id] as string) ?? ''}
-            placeholder="Answer…"
+            placeholder="Thoughts…"
             onChange={(v) => onStringAnswer(question.id, v)}
             className={`${base} min-h-[72px]`}
           />
