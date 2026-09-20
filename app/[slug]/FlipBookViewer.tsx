@@ -583,11 +583,10 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
 
   // ── Responsive layout: 1-page vs 2-page spread ──
   // Show a two-page book spread when the device is in landscape AND wide enough
-  // to be a tablet (stage width ≥ 800px after padding). Phones in landscape are
-  // typically under ~650px stage width, so they stay in single-page mode and
-  // simply stretch to fill the full available width.
+  // to be a tablet.
   const isLandscape = bookSize.width > bookSize.height
   const showTwoPages = isLandscape
+  
   // pageWidth is the width of a single page. In two-page mode react-pageflip
   // renders the full spread as 2 × pageWidth.
   const pageWidth = showTwoPages ? Math.floor(bookSize.width / 2) : bookSize.width
@@ -1033,17 +1032,17 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     iframe.style.height = '0'
     iframe.style.border = '0'
     document.body.appendChild(iframe)
-    
+
     const win = iframe.contentWindow
     if (!win) {
       document.body.removeChild(iframe)
       return
     }
-    
+
     win.document.open()
     win.document.write(html)
     win.document.close()
-    
+
     // Clean up after print dialog is closed (or cancelled)
     // Most modern browsers support afterprint on the iframe's window
     win.addEventListener('afterprint', () => {
@@ -1054,144 +1053,144 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
         }
       }, 100)
     })
-    
+
     // Small delay so the browser finishes painting before print dialog
-    setTimeout(() => { 
+    setTimeout(() => {
       win.focus()
-      win.print() 
+      win.print()
     }, 400)
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-      <div
-        ref={containerRef}
-        className={`flex flex-col overflow-hidden print:bg-white ${isDark
-            ? 'bg-gray-950'
-            : 'bg-gradient-to-b from-slate-100 to-slate-200'
-          }`}
-        style={{
-          // Layer 1: JS-measured exact visible height (visualViewport, most accurate)
-          // Layer 2: 100dvh — dynamic viewport, excludes chrome on modern browsers
-          // Layer 3: -webkit-fill-available — Safari < 15.4 legacy
-          // Layer 4: 100vh — universal fallback (may include chrome on old mobile)
-          height: 'var(--app-height, 100dvh)',
-          // @ts-expect-error — non-standard but required for Safari < 15.4
-          WebkitHeight: '-webkit-fill-available',
-          minHeight: '-webkit-fill-available',
-        }}
-      >
+    <div
+      ref={containerRef}
+      className={`flex flex-col overflow-hidden print:bg-white ${isDark
+        ? 'bg-gray-950'
+        : 'bg-gradient-to-b from-slate-100 to-slate-200'
+        }`}
+      style={{
+        // Layer 1: JS-measured exact visible height (visualViewport, most accurate)
+        // Layer 2: 100dvh — dynamic viewport, excludes chrome on modern browsers
+        // Layer 3: -webkit-fill-available — Safari < 15.4 legacy
+        // Layer 4: 100vh — universal fallback (may include chrome on old mobile)
+        height: 'var(--app-height, 100dvh)',
+        // @ts-expect-error — non-standard but required for Safari < 15.4
+        WebkitHeight: '-webkit-fill-available',
+        minHeight: '-webkit-fill-available',
+      }}
+    >
 
-        {/* Hidden Share Card for image generation */}
-        <div className="fixed -left-[9999px] -top-[9999px]">
-          <ShareCard
-            ref={shareCardRef}
-            title={studyMaterial.title}
-            slug={studyMaterial.slug}
-            date={new Date(studyMaterial.created_at).toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric', year: 'numeric'
-            })}
-            url={typeof window !== 'undefined' ? window.location.href : ''}
-          />
+      {/* Hidden Share Card for image generation */}
+      <div className="fixed -left-[9999px] -top-[9999px]">
+        <ShareCard
+          ref={shareCardRef}
+          title={studyMaterial.title}
+          slug={studyMaterial.slug}
+          date={new Date(studyMaterial.created_at).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric'
+          })}
+          url={typeof window !== 'undefined' ? window.location.href : ''}
+        />
+      </div>
+
+      {/* ── Top bar ── */}
+      <header className={`flex-shrink-0 flex items-center justify-between px-4 py-2.5 backdrop-blur-sm border-b print:hidden ${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
+        {/* Left: title */}
+        <div className="min-w-0 flex-1 mr-2">
+          <h1 className={`text-sm font-bold break-words ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{studyMaterial.title}</h1>
+          {studyMaterial.organization && (
+            <p className={`text-xs break-words ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{studyMaterial.organization}</p>
+          )}
         </div>
 
-        {/* ── Top bar ── */}
-        <header className={`flex-shrink-0 flex items-center justify-between px-4 py-2.5 backdrop-blur-sm border-b print:hidden ${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
-          {/* Left: title */}
-          <div className="min-w-0 flex-1 mr-2">
-            <h1 className={`text-sm font-bold break-words ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{studyMaterial.title}</h1>
-            {studyMaterial.organization && (
-              <p className={`text-xs break-words ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{studyMaterial.organization}</p>
-            )}
-          </div>
+        {/* Right: controls */}
+        <div className="flex items-center gap-1 flex-shrink-0">
 
-          {/* Right: controls */}
-          <div className="flex items-center gap-1 flex-shrink-0">
+          {/* ── Tablet-only inline controls (hidden on mobile, shown on md+) ── */}
+          <div className="hidden md:flex items-center gap-1">
+            {/* A− */}
+            <button
+              type="button"
+              onClick={smallerFont}
+              disabled={fontSize <= MIN_FONT}
+              title="Decrease font size"
+              className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 w-10 rounded-xl border text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 text-gray-400 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+            >
+              A<span className="text-[9px] align-super">−</span>
+            </button>
 
-            {/* ── Tablet-only inline controls (hidden on mobile, shown on md+) ── */}
-            <div className="hidden md:flex items-center gap-1">
-              {/* A− */}
+            {/* A reset + size badge */}
+            <div className="inline-flex flex-col items-center justify-center gap-0 h-10 px-2">
               <button
                 type="button"
-                onClick={smallerFont}
-                disabled={fontSize <= MIN_FONT}
-                title="Decrease font size"
-                className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 w-10 rounded-xl border text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 text-gray-400 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                onClick={resetFont}
+                disabled={fontSize === DEFAULT_FONT}
+                title="Reset font size"
+                className={`inline-flex items-center justify-center w-8 h-6 rounded-lg border text-sm font-bold transition-colors ${fontSize === DEFAULT_FONT
+                  ? isDark ? 'border-gray-700 bg-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                  : 'border-indigo-500 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60'
+                  }`}
               >
-                A<span className="text-[9px] align-super">−</span>
+                A
               </button>
+              <span className={`text-[9px] leading-none mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{fontSize}px</span>
+            </div>
 
-              {/* A reset + size badge */}
-              <div className="inline-flex flex-col items-center justify-center gap-0 h-10 px-2">
-                <button
-                  type="button"
-                  onClick={resetFont}
-                  disabled={fontSize === DEFAULT_FONT}
-                  title="Reset font size"
-                  className={`inline-flex items-center justify-center w-8 h-6 rounded-lg border text-sm font-bold transition-colors ${fontSize === DEFAULT_FONT
-                      ? isDark ? 'border-gray-700 bg-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                      : 'border-indigo-500 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60'
-                    }`}
-                >
-                  A
-                </button>
-                <span className={`text-[9px] leading-none mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{fontSize}px</span>
-              </div>
+            {/* A+ */}
+            <button
+              type="button"
+              onClick={biggerFont}
+              disabled={fontSize >= MAX_FONT}
+              title="Increase font size"
+              className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 w-10 rounded-xl border text-base font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 text-gray-400 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+            >
+              A<span className="text-[9px] align-super">+</span>
+            </button>
 
-              {/* A+ */}
-              <button
-                type="button"
-                onClick={biggerFont}
-                disabled={fontSize >= MAX_FONT}
-                title="Increase font size"
-                className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 w-10 rounded-xl border text-base font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 text-gray-400 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-              >
-                A<span className="text-[9px] align-super">+</span>
-              </button>
+            <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
 
-              <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+            {/* Share */}
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={isSharing}
+              title="Share via WhatsApp"
+              className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 px-3 rounded-xl border transition-colors ${isDark ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+            >
+              <Share2 className="h-4 w-4" />
+              <span className="text-[9px] font-medium leading-none">{isSharing ? '...' : 'Share'}</span>
+            </button>
 
-              {/* Share */}
-              <button
-                type="button"
-                onClick={handleShare}
-                disabled={isSharing}
-                title="Share via WhatsApp"
-                className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 px-3 rounded-xl border transition-colors ${isDark ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
-              >
-                <Share2 className="h-4 w-4" />
-                <span className="text-[9px] font-medium leading-none">{isSharing ? '...' : 'Share'}</span>
-              </button>
+            <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
 
-              <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+            {/* Reset answers */}
+            <button
+              type="button"
+              onClick={openResetConfirm}
+              title="Reset answers"
+              className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 px-3 rounded-xl border hover:text-red-400 hover:border-red-800 hover:bg-red-950/40 transition-colors ${isDark ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50'}`}
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span className="text-[9px] font-medium leading-none">Reset</span>
+            </button>
 
-              {/* Reset answers */}
-              <button
-                type="button"
-                onClick={openResetConfirm}
-                title="Reset answers"
-                className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 px-3 rounded-xl border hover:text-red-400 hover:border-red-800 hover:bg-red-950/40 transition-colors ${isDark ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50'}`}
-              >
-                <RotateCcw className="h-4 w-4" />
-                <span className="text-[9px] font-medium leading-none">Reset</span>
-              </button>
+            {/* PDF */}
+            <button
+              type="button"
+              onClick={handlePrint}
+              title="Save as PDF"
+              className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 px-3 rounded-xl border transition-colors ${isDark ? 'border-indigo-700 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60' : 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-300'}`}
+            >
+              <Printer className="h-4 w-4" />
+              <span className="text-[9px] font-medium leading-none">PDF</span>
+            </button>
 
-              {/* PDF */}
-              <button
-                type="button"
-                onClick={handlePrint}
-                title="Save as PDF"
-                className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 px-3 rounded-xl border transition-colors ${isDark ? 'border-indigo-700 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60' : 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-300'}`}
-              >
-                <Printer className="h-4 w-4" />
-                <span className="text-[9px] font-medium leading-none">PDF</span>
-              </button>
+            <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
 
-              <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-
-              {/* Light / Dark theme toggle */}
-              {/* <div className={`flex h-10 rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            {/* Light / Dark theme toggle */}
+            {/* <div className={`flex h-10 rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
                 <button
                   type="button"
                   onClick={() => setIsDark(false)}
@@ -1214,104 +1213,103 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
 
               <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} /> */}
 
-            </div>
+          </div>
 
-            {/* ── Mobile-only Style gear (md:hidden) ── */}
-            <div className="md:hidden">
-              <button
-                type="button"
-                onClick={() => setCustomizeOpen((o) => !o)}
-                title="Customize"
-                className={`inline-flex flex-col items-center justify-center gap-0.5 rounded-xl border px-3 py-1.5 transition-colors min-w-[44px] ${customizeOpen
-                    ? isDark ? 'border-indigo-700 bg-indigo-900/40 text-indigo-400' : 'border-indigo-300 bg-indigo-50 text-indigo-600'
-                    : isDark ? 'border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-                  }`}
-              >
-                <Settings className="h-4 w-4" />
-                <span className="text-[9px] font-medium leading-none">
-                  {customizeOpen ? 'Close' : 'Options'}
-                </span>
-              </button>
-            </div>
-
-            <div className={`w-px h-8 mx-0.5 md:hidden ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-
-            {/* Fullscreen — always visible */}
+          {/* ── Mobile-only Style gear (md:hidden) ── */}
+          <div className="md:hidden">
             <button
               type="button"
-              onClick={toggleFullscreen}
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-              className={`inline-flex flex-col items-center justify-center gap-0.5 rounded-xl border px-3 py-1.5 transition-colors min-w-[44px] ${
-                isFullscreen
-                  ? isDark ? 'border-gray-600 bg-gray-700 text-gray-200 hover:bg-gray-600' : 'border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  : isDark ? 'border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-              }`}
+              onClick={() => setCustomizeOpen((o) => !o)}
+              title="Customize"
+              className={`inline-flex flex-col items-center justify-center gap-0.5 rounded-xl border px-3 py-1.5 transition-colors min-w-[44px] ${customizeOpen
+                ? isDark ? 'border-indigo-700 bg-indigo-900/40 text-indigo-400' : 'border-indigo-300 bg-indigo-50 text-indigo-600'
+                : isDark ? 'border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                }`}
             >
-              {isFullscreen ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              <Settings className="h-4 w-4" />
               <span className="text-[9px] font-medium leading-none">
-                {isFullscreen ? 'Exit' : 'Full'}
+                {customizeOpen ? 'Close' : 'Options'}
               </span>
             </button>
           </div>
-        </header>
 
-        {/* ── Customize toolbar — inline panel, mobile only ──
+          <div className={`w-px h-8 mx-0.5 md:hidden ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+
+          {/* Fullscreen — always visible */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            className={`inline-flex flex-col items-center justify-center gap-0.5 rounded-xl border px-3 py-1.5 transition-colors min-w-[44px] ${isFullscreen
+                ? isDark ? 'border-gray-600 bg-gray-700 text-gray-200 hover:bg-gray-600' : 'border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : isDark ? 'border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+          >
+            {isFullscreen ? <X className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            <span className="text-[9px] font-medium leading-none">
+              {isFullscreen ? 'Exit' : 'Full'}
+            </span>
+          </button>
+        </div>
+      </header>
+
+      {/* ── Customize toolbar — inline panel, mobile only ──
           Renders as a sibling to the header (not inside it), so it's never
           clipped by overflow and doesn't need z-index tricks. Hidden on md+. */}
-        {customizeOpen && (
-          <div className={`md:hidden flex-shrink-0 border-b px-4 py-3 print:hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center gap-3">
-              {/* Font size label */}
-              <span className={`text-[10px] font-semibold uppercase tracking-widest w-16 flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Font</span>
-              {/* A− */}
-              <button
-                type="button"
-                onClick={smallerFont}
-                disabled={fontSize <= MIN_FONT}
-                className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-400' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'}`}
-              >
-                A<span className="text-[9px] align-super">−</span>
-              </button>
-              {/* A reset */}
-              <button
-                type="button"
-                onClick={resetFont}
-                disabled={fontSize === DEFAULT_FONT}
-                className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border text-sm font-bold transition-colors ${fontSize === DEFAULT_FONT
-                    ? isDark ? 'border-gray-700 bg-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                    : 'border-indigo-500 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60'
-                  }`}
-              >
-                A
-              </button>
-              {/* A+ */}
-              <button
-                type="button"
-                onClick={biggerFont}
-                disabled={fontSize >= MAX_FONT}
-                className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border text-base font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-400' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'}`}
-              >
-                A<span className="text-[9px] align-super">+</span>
-              </button>
-              {/* px label */}
-              <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{fontSize}px</span>
+      {customizeOpen && (
+        <div className={`md:hidden flex-shrink-0 border-b px-4 py-3 print:hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center gap-3">
+            {/* Font size label */}
+            <span className={`text-[10px] font-semibold uppercase tracking-widest w-16 flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Font</span>
+            {/* A− */}
+            <button
+              type="button"
+              onClick={smallerFont}
+              disabled={fontSize <= MIN_FONT}
+              className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-400' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'}`}
+            >
+              A<span className="text-[9px] align-super">−</span>
+            </button>
+            {/* A reset */}
+            <button
+              type="button"
+              onClick={resetFont}
+              disabled={fontSize === DEFAULT_FONT}
+              className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border text-sm font-bold transition-colors ${fontSize === DEFAULT_FONT
+                ? isDark ? 'border-gray-700 bg-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                : 'border-indigo-500 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60'
+                }`}
+            >
+              A
+            </button>
+            {/* A+ */}
+            <button
+              type="button"
+              onClick={biggerFont}
+              disabled={fontSize >= MAX_FONT}
+              className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border text-base font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-400' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'}`}
+            >
+              A<span className="text-[9px] align-super">+</span>
+            </button>
+            {/* px label */}
+            <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{fontSize}px</span>
 
-              {/* Share (Mobile) */}
-              <button
-                type="button"
-                onClick={handleShare}
-                disabled={isSharing}
-                className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${isDark ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                {isSharing ? 'Sharing...' : 'Share'}
-              </button>
+            {/* Share (Mobile) */}
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={isSharing}
+              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${isDark ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              {isSharing ? 'Sharing...' : 'Share'}
+            </button>
 
-              {/* Spacer */}
-              <div className="flex-1" />
+            {/* Spacer */}
+            <div className="flex-1" />
 
-              {/* Light / Dark toggle */}
-              {/* <div className={`flex rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            {/* Light / Dark toggle */}
+            {/* <div className={`flex rounded-xl border overflow-hidden ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
                 <button
                   type="button"
                   onClick={() => setIsDark(false)}
@@ -1327,237 +1325,235 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
                   <Moon className="h-3.5 w-3.5" /> Dark
                 </button>
               </div> */}
-            </div>
-
-            {/* ── Row 2: Actions ── */}
-            <div className={`h-px -mx-4 ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`} />
-            <div className="flex items-center gap-3 pt-2">
-              <span className={`text-[10px] font-semibold uppercase tracking-widest w-16 flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Actions</span>
-              <button
-                type="button"
-                onClick={openResetConfirm}
-                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium transition-colors hover:text-red-400 hover:border-red-800 hover:bg-red-950/40 ${isDark ? 'border-gray-700 bg-gray-800 text-gray-400' : 'border-gray-200 bg-gray-50 hover:bg-red-50 hover:border-red-200 hover:text-red-500 text-gray-600'}`}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset answers
-              </button>
-              <button
-                type="button"
-                onClick={handlePrint}
-                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium transition-colors ${isDark ? 'border-indigo-700 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60' : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-600'}`}
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Save PDF
-              </button>
-            </div>
           </div>
-        )}
 
-        {/*
+          {/* ── Row 2: Actions ── */}
+          <div className={`h-px -mx-4 ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`} />
+          <div className="flex items-center gap-3 pt-2">
+            <span className={`text-[10px] font-semibold uppercase tracking-widest w-16 flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Actions</span>
+            <button
+              type="button"
+              onClick={openResetConfirm}
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium transition-colors hover:text-red-400 hover:border-red-800 hover:bg-red-950/40 ${isDark ? 'border-gray-700 bg-gray-800 text-gray-400' : 'border-gray-200 bg-gray-50 hover:bg-red-50 hover:border-red-200 hover:text-red-500 text-gray-600'}`}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset answers
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-medium transition-colors ${isDark ? 'border-indigo-700 bg-indigo-900/40 text-indigo-400 hover:bg-indigo-900/60' : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-600'}`}
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Save PDF
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/*
         ── Hidden question-height probe ───────────────────────────────────────
         Rendered off-screen (position:fixed, top:-9999px) so the browser lays
         it out at bookSize.width content width and the current fontSize, giving
         real getBoundingClientRect heights for each question item.
         The useEffect above reads these heights to compute questionsPerPage.
       */}
-        <div
-          ref={probeRef}
-          aria-hidden
-          style={{
-            position: 'fixed',
-            top: -9999,
-            left: 0,
-            // Probe uses single-page width so measurements match the real rendered page.
-            // In two-page mode pageWidth = bookSize.width/2; in single-page mode it equals bookSize.width.
-            width: pageWidth,
-            fontSize: fontSize,
-            visibility: 'hidden',
-            pointerEvents: 'none',
-            zIndex: -1,
-          }}
-        >
-          {allQuestions.map((q) => (
-            <div key={q.id} className="space-y-1">
-              {/* Label — same style as QuestionInput */}
-              <label style={{ fontSize: '0.9em' }} className="block font-medium text-gray-700 leading-snug">
-                {q.prompt}
-              </label>
-              {/* Input area — mirrors QuestionInput rendering */}
-              {(q.type === 'text' || q.type === 'textarea' || !q.type) && (
-                <textarea
-                  rows={3}
-                  readOnly
-                  tabIndex={-1}
-                  className="w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 min-h-[72px] resize-y"
-                />
-              )}
-              {q.type === 'radio' && (
-                <div className="space-y-1">
-                  {(q.options ?? []).map((opt, i) => (
-                    <label key={i} className="flex items-center gap-1.5">
-                      <input type="radio" readOnly tabIndex={-1} className="h-3 w-3" />
-                      <span className="text-xs text-gray-600">{opt}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              {q.type === 'checkbox' && (
-                <div className="space-y-1">
-                  {(q.options ?? []).map((opt, i) => (
-                    <label key={i} className="flex items-center gap-1.5">
-                      <input type="checkbox" readOnly tabIndex={-1} className="h-3 w-3 rounded" />
-                      <span className="text-xs text-gray-600">{opt}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Book stage ── */}
-        <div
-          ref={stageRef}
-          className="relative flex-1 flex flex-col items-center justify-start overflow-y-auto overflow-x-hidden print:hidden p-[10px]"
-        >
-
-          {mounted ? (
-            <HTMLFlipBook
-              ref={bookRef}
-              width={pageWidth}
-              height={bookSize.height}
-              size="fixed"
-              minWidth={220}
-              maxWidth={pageWidth}
-              minHeight={320}
-              maxHeight={bookSize.height}
-              drawShadow
-              flippingTime={700}
-              usePortrait={!showTwoPages}
-              showCover={true}
-              mobileScrollSupport={true}
-              clickEventForward={false}
-              useMouseEvents={false}
-              showPageCorners={false}
-              disableFlipByClick={true}
-              maxShadowOpacity={0.4}
-              className="shadow-2xl"
-              style={{}}
-              startPage={0}
-              startZIndex={0}
-              autoSize={false}
-              swipeDistance={60}
-              renderOnlyPageLengthChange={true}
-              onFlip={(e) => setCurrentPage(e.data)}
-            >
-              {pages.map((page, idx) => {
-                const isCover = page.kind === 'cover'
-                const isBack = page.kind === 'back'
-                const showNum = !isCover && !isBack && page.kind !== 'blank'
-                return (
-                  <Page
-                    key={idx}
-                    density="soft"
-                    pageNum={showNum ? idx : undefined}
-                    totalPages={totalPages}
-                    isDark={isDark}
-                  >
-                    {renderPageContent(page)}
-                  </Page>
-                )
-              })}
-            </HTMLFlipBook>
-          ) : (
-            // Pre-mount skeleton
-            <div className="w-[330px] h-[500px] rounded-lg bg-white shadow-2xl animate-pulse" />
-          )}
-        </div>
-
-        {/* ── Bottom nav ── */}
-        <nav className={`flex-shrink-0 flex items-center justify-between px-6 py-3 backdrop-blur-sm border-t print:hidden ${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={currentPage === 0}
-            aria-label="Previous page"
-            className={`inline-flex items-center gap-1 rounded-xl border disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-4 py-1.5 text-sm font-medium ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Prev
-          </button>
-
-          <span className={`text-xs font-medium ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-            {currentPage + 1} / {totalPages}
-          </span>
-
-          {/* ── Font size controls removed — moved to Customize dropdown ── */}
-
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={currentPage >= totalPages - 1}
-            aria-label="Next page"
-            className={`inline-flex items-center gap-1 rounded-xl border disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-4 py-1.5 text-sm font-medium ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
-          >
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </nav>
-
-
-        {/* Print layout is generated in a new window via handlePrint() — no in-DOM component needed */}
-
-
-        {/* ── Scripture modal ── */}
-        {modalSection && (
-          <ScriptureModal
-            sectionTitle={modalSection.title}
-            scriptureReference={modalSection.scripture_reference}
-            summary={modalSection.summary}
-            scriptureText={modalSection.scripture_text}
-            fontSize={fontSize}
-            onClose={() => setModalSection(null)}
-          />
-        )}
-        {/* Reset-answers confirmation drawer */}
-        {resetConfirmOpen && (
-          <div className="fixed inset-0 z-50 flex flex-col justify-end print:hidden" role="presentation">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setResetConfirmOpen(false)} />
-            <div
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="reset-confirm-heading"
-              className={`relative z-10 w-full rounded-t-2xl border-t border-x shadow-2xl px-5 pt-4 pb-8 ${
-                isDark
-                  ? 'bg-gray-900 border-gray-700'
-                  : 'bg-white border-gray-200'
-              }`}
-              style={{ animation: 'slideUp 300ms cubic-bezier(0.22,1,0.36,1) both' }}
-            >
-              <div className="flex justify-center mb-4" aria-hidden="true">
-                <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
+      <div
+        ref={probeRef}
+        aria-hidden
+        style={{
+          position: 'fixed',
+          top: -9999,
+          left: 0,
+          // Probe uses single-page width so measurements match the real rendered page.
+          // In two-page mode pageWidth = bookSize.width/2; in single-page mode it equals bookSize.width.
+          width: pageWidth,
+          fontSize: fontSize,
+          visibility: 'hidden',
+          pointerEvents: 'none',
+          zIndex: -1,
+        }}
+      >
+        {allQuestions.map((q) => (
+          <div key={q.id} className="space-y-1">
+            {/* Label — same style as QuestionInput */}
+            <label style={{ fontSize: '0.9em' }} className="block font-medium text-gray-700 leading-snug">
+              {q.prompt}
+            </label>
+            {/* Input area — mirrors QuestionInput rendering */}
+            {(q.type === 'text' || q.type === 'textarea' || !q.type) && (
+              <textarea
+                rows={3}
+                readOnly
+                tabIndex={-1}
+                className="w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 min-h-[72px] resize-y"
+              />
+            )}
+            {q.type === 'radio' && (
+              <div className="space-y-1">
+                {(q.options ?? []).map((opt, i) => (
+                  <label key={i} className="flex items-center gap-1.5">
+                    <input type="radio" readOnly tabIndex={-1} className="h-3 w-3" />
+                    <span className="text-xs text-gray-600">{opt}</span>
+                  </label>
+                ))}
               </div>
-              <div className="flex items-start gap-3 mb-3">
-                <div className={`flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full border ${
-                  isDark ? 'bg-red-950/40 border-red-800' : 'bg-red-50 border-red-200'
-                }`}>
-                  <RotateCcw className="h-5 w-5 text-red-500" />
-                </div>
-                <div>
-                  <h2 id="reset-confirm-heading" className={`text-base font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Reset all answers?</h2>
-                  <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This will permanently clear every answer you have entered for this study guide. This cannot be undone.</p>
-                </div>
+            )}
+            {q.type === 'checkbox' && (
+              <div className="space-y-1">
+                {(q.options ?? []).map((opt, i) => (
+                  <label key={i} className="flex items-center gap-1.5">
+                    <input type="checkbox" readOnly tabIndex={-1} className="h-3 w-3 rounded" />
+                    <span className="text-xs text-gray-600">{opt}</span>
+                  </label>
+                ))}
               </div>
-              <div className="flex gap-3 mt-5">
-                <button type="button" onClick={() => setResetConfirmOpen(false)} className={`flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors ${
-                  isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'
-                }`}>Cancel</button>
-                <button type="button" onClick={doResetAnswers} className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 py-3 text-sm font-semibold text-white transition-colors">Yes, reset</button>
-              </div>
-            </div>
-            <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+            )}
           </div>
+        ))}
+      </div>
+
+      {/* ── Book stage ── */}
+      <div
+        ref={stageRef}
+        className="relative flex-1 flex flex-col items-center justify-start overflow-hidden print:hidden p-[10px]"
+      >
+
+        {mounted && pageWidth > 0 ? (
+          <HTMLFlipBook
+            key={`${pageWidth}-${bookSize.height}-${questionsPerPage}`}
+            ref={bookRef}
+            width={pageWidth}
+            height={bookSize.height}
+            size="fixed"
+            minWidth={220}
+            maxWidth={pageWidth}
+            minHeight={320}
+            maxHeight={bookSize.height}
+            drawShadow
+            flippingTime={700}
+            usePortrait={!showTwoPages}
+            showCover={true}
+            mobileScrollSupport={true}
+            clickEventForward={false}
+            useMouseEvents={false}
+            showPageCorners={false}
+            disableFlipByClick={true}
+            maxShadowOpacity={0.4}
+            className="shadow-2xl"
+            style={{}}
+            startPage={0}
+            startZIndex={0}
+            autoSize={false}
+            swipeDistance={60}
+            renderOnlyPageLengthChange={true}
+            onFlip={(e) => setCurrentPage(e.data)}
+          >
+            {pages.map((page, idx) => {
+              const isCover = page.kind === 'cover'
+              const isBack = page.kind === 'back'
+              const showNum = !isCover && !isBack && page.kind !== 'blank'
+              return (
+                <Page
+                  key={idx}
+                  density="soft"
+                  pageNum={showNum ? idx : undefined}
+                  totalPages={totalPages}
+                  isDark={isDark}
+                >
+                  {renderPageContent(page)}
+                </Page>
+              )
+            })}
+          </HTMLFlipBook>
+        ) : (
+          // Pre-mount skeleton
+          <div className="w-[330px] h-[500px] rounded-lg bg-white shadow-2xl animate-pulse" />
         )}
       </div>
-    )
-  }
+
+      {/* ── Bottom nav ── */}
+      <nav className={`flex-shrink-0 flex items-center justify-between px-6 py-3 backdrop-blur-sm border-t print:hidden ${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
+        <button
+          type="button"
+          onClick={goPrev}
+          disabled={currentPage === 0}
+          aria-label="Previous page"
+          className={`inline-flex items-center gap-1 rounded-xl border disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-4 py-1.5 text-sm font-medium ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Prev
+        </button>
+
+        <span className={`text-xs font-medium ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+          {currentPage + 1} / {totalPages}
+        </span>
+
+        {/* ── Font size controls removed — moved to Customize dropdown ── */}
+
+        <button
+          type="button"
+          onClick={goNext}
+          disabled={currentPage >= totalPages - 1}
+          aria-label="Next page"
+          className={`inline-flex items-center gap-1 rounded-xl border disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-4 py-1.5 text-sm font-medium ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </nav>
+
+
+      {/* Print layout is generated in a new window via handlePrint() — no in-DOM component needed */}
+
+
+      {/* ── Scripture modal ── */}
+      {modalSection && (
+        <ScriptureModal
+          sectionTitle={modalSection.title}
+          scriptureReference={modalSection.scripture_reference}
+          summary={modalSection.summary}
+          scriptureText={modalSection.scripture_text}
+          fontSize={fontSize}
+          onClose={() => setModalSection(null)}
+        />
+      )}
+      {/* Reset-answers confirmation drawer */}
+      {resetConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end print:hidden" role="presentation">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setResetConfirmOpen(false)} />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="reset-confirm-heading"
+            className={`relative z-10 w-full rounded-t-2xl border-t border-x shadow-2xl px-5 pt-4 pb-8 ${isDark
+                ? 'bg-gray-900 border-gray-700'
+                : 'bg-white border-gray-200'
+              }`}
+            style={{ animation: 'slideUp 300ms cubic-bezier(0.22,1,0.36,1) both' }}
+          >
+            <div className="flex justify-center mb-4" aria-hidden="true">
+              <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
+            </div>
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full border ${isDark ? 'bg-red-950/40 border-red-800' : 'bg-red-50 border-red-200'
+                }`}>
+                <RotateCcw className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h2 id="reset-confirm-heading" className={`text-base font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Reset all answers?</h2>
+                <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This will permanently clear every answer you have entered for this study guide. This cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button type="button" onClick={() => setResetConfirmOpen(false)} className={`flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors ${isDark ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'
+                }`}>Cancel</button>
+              <button type="button" onClick={doResetAnswers} className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 py-3 text-sm font-semibold text-white transition-colors">Yes, reset</button>
+            </div>
+          </div>
+          <style>{`@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+        </div>
+      )}
+    </div>
+  )
+}
