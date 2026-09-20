@@ -233,7 +233,7 @@ function CoverContent({ material }: { material: StudyMaterial }) {
         )
       })()}
 
-      <p style={{ fontSize: '0.65em' }} className="text-center text-indigo-400">Drag corners or tap edges to turn pages →</p>
+      <p style={{ fontSize: '0.65em' }} className="text-center text-indigo-400">Click Next / Prev button to turn pages →</p>
     </div>
   )
 }
