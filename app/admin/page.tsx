@@ -44,10 +44,10 @@ export default async function AdminDashboardPage() {
       {/* ── Top bar ── */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
         <div>
-          <h1 className="text-lg font-bold text-gray-100 tracking-tight">Study Guides</h1>
+          <h1 className="text-lg font-bold text-gray-100 tracking-tight">Discussions</h1>
           {!error && guides.length > 0 && (
             <p className="text-xs text-gray-500 mt-0.5">
-              {guides.length} guide{guides.length !== 1 ? 's' : ''} · use ← → to flip
+              {guides.length} discussion{guides.length !== 1 ? 's' : ''} · use ← → to flip
             </p>
           )}
         </div>
@@ -58,7 +58,7 @@ export default async function AdminDashboardPage() {
           className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20"
         >
           <PlusCircle className="h-4 w-4" aria-hidden="true" />
-          New Guide
+          New Discussion
         </Link>
       </header>
 

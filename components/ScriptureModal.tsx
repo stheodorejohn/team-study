@@ -25,6 +25,7 @@ interface ScriptureModalProps {
   scriptureReference: string | null
   summary: string | null
   scriptureText: string | null
+  fontSize?: number
   triggerRef?: React.RefObject<HTMLElement | null>
   onClose: () => void
 }
@@ -39,6 +40,7 @@ export function ScriptureModal({
   scriptureReference,
   summary,
   scriptureText,
+  fontSize,
   triggerRef,
   onClose,
 }: ScriptureModalProps) {
@@ -246,7 +248,15 @@ export function ScriptureModal({
               <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
                 Summary
               </h3>
-              <p className="text-sm text-gray-600 leading-relaxed">{summary}</p>
+              <p 
+                className="text-gray-600"
+                style={{ 
+                  fontSize: fontSize ? `${fontSize}px` : undefined,
+                  lineHeight: fontSize ? `${fontSize * 1.6}px` : '1.625rem'
+                }}
+              >
+                {summary}
+              </p>
             </section>
           )}
 
@@ -256,7 +266,13 @@ export function ScriptureModal({
                 Passage
               </h3>
               <div className="rounded-xl bg-white border border-gray-200 px-4 py-4 shadow-sm">
-                <p className="text-sm text-gray-800 leading-8 whitespace-pre-wrap font-serif">
+                <p 
+                  className="text-gray-800 whitespace-pre-wrap font-serif"
+                  style={{ 
+                    fontSize: fontSize ? `${fontSize}px` : undefined,
+                    lineHeight: fontSize ? `${fontSize * 1.6}px` : '2rem'
+                  }}
+                >
                   {scriptureText}
                 </p>
               </div>

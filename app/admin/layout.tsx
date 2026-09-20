@@ -68,7 +68,7 @@ export default async function AdminLayout({
               href="/admin/editor/new"
               className="rounded-md bg-indigo-600 px-3 py-1.5 text-white text-xs font-medium hover:bg-indigo-500 transition-colors"
             >
-              + New Guide
+              + New Discussion
             </a>
           </nav>
         </div>

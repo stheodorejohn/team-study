@@ -25,7 +25,10 @@ import {
   BookOpen,
   PlusCircle,
   Download,
+  Share2,
 } from 'lucide-react'
+import { toBlob } from 'html-to-image'
+import { ShareCard } from '../[slug]/ShareCard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +79,9 @@ function GuideCard({
   origin: string
 }) {
   const [copied, setCopied] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
+  const shareCardRef = useRef<HTMLDivElement>(null)
+  
   const p = palette(index)
   const publicUrl = `${origin}/${guide.slug}`
 
@@ -83,6 +89,39 @@ function GuideCard({
     await navigator.clipboard.writeText(publicUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleShare = async () => {
+    if (!shareCardRef.current || isSharing) return
+    setIsSharing(true)
+    try {
+      const blob = await toBlob(shareCardRef.current, {
+        cacheBust: true,
+        pixelRatio: 2
+      })
+      if (!blob) throw new Error('Failed to generate image')
+
+      const file = new File([blob], `${guide.slug}-share.png`, { type: 'image/png' })
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: guide.title,
+          files: [file]
+        })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${guide.slug}-share.png`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch (err) {
+      console.error('Error sharing:', err)
+      alert('Could not share the image.')
+    } finally {
+      setIsSharing(false)
+    }
   }
 
   function downloadQR() {
@@ -97,6 +136,17 @@ function GuideCard({
 
   return (
     <div className="h-full w-full flex items-center justify-center p-4 sm:p-8">
+      {/* Hidden ShareCard for rendering image */}
+      <div className="fixed -left-[9999px] top-0 pointer-events-none">
+        <ShareCard
+          ref={shareCardRef}
+          title={guide.title}
+          slug={guide.slug}
+          date={formatDate(guide.created_at)}
+          url={publicUrl}
+        />
+      </div>
+
       <div
         className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl shadow-black/50 flex flex-col"
         style={{ minHeight: 480 }}
@@ -110,7 +160,7 @@ function GuideCard({
         >
           {/* Index badge */}
           <span className="self-start rounded-full bg-white/20 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-white tracking-wider uppercase">
-            Guide {index + 1}
+            Discussion {index + 1}
           </span>
 
           {/* Title */}
@@ -196,11 +246,20 @@ function GuideCard({
 
             <button
               type="button"
+              onClick={handleShare}
+              disabled={isSharing}
+              className="inline-flex items-center gap-2 rounded-xl bg-gray-800 hover:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-200 transition-colors disabled:opacity-50"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              {isSharing ? 'Sharing...' : 'Share image'}
+            </button>
+            <button
+              type="button"
               onClick={downloadQR}
               className="inline-flex items-center gap-2 rounded-xl bg-gray-800 hover:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-200 transition-colors"
             >
               <Download className="h-3.5 w-3.5" />
-              Download
+              Download QR
             </button>
           </div>
         </div>
@@ -218,9 +277,9 @@ function EmptyState() {
         <BookOpen className="h-12 w-12 text-gray-600" aria-hidden />
       </div>
       <div>
-        <h2 className="text-xl font-bold text-gray-200">No guides yet</h2>
+        <h2 className="text-xl font-bold text-gray-200">No discussions yet</h2>
         <p className="text-sm text-gray-500 mt-2 max-w-xs leading-relaxed">
-          Create your first study guide — it becomes a shareable, QR-linked
+          Create your first discussion — it becomes a shareable, QR-linked
           flipbook students fill in on their phones.
         </p>
       </div>
@@ -229,7 +288,7 @@ function EmptyState() {
         className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors px-5 py-2.5 text-sm font-semibold text-white"
       >
         <PlusCircle className="h-4 w-4" />
-        Create Guide
+        Create Discussion
       </Link>
     </div>
   )

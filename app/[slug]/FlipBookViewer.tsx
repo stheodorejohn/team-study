@@ -32,11 +32,14 @@ import {
   Maximize,
   X,
   Settings,
+  Share2,
   // Sun,
   // Moon,
 } from 'lucide-react'
+import { toBlob } from 'html-to-image'
 import type { StudyMaterial, StudySection, Question } from '@/lib/supabase'
 import { ScriptureModal } from '@/components/ScriptureModal'
+import { ShareCard } from './ShareCard'
 
 // ─── Answer state ─────────────────────────────────────────────────────────────
 
@@ -216,16 +219,19 @@ function CoverContent({ material }: { material: StudyMaterial }) {
       </div>
 
       {/* Memory verse */}
-      {material.memory_verse && (
-        <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 px-4 py-3">
-          <p style={{ fontSize: '0.65em' }} className="font-semibold text-indigo-300 uppercase tracking-widest mb-1">
-            Memory Verse
-          </p>
-          <p style={{ fontSize: '0.75em' }} className="text-indigo-100 italic leading-relaxed">
-            {material.memory_verse}
-          </p>
-        </div>
-      )}
+      {material.memory_verse && (() => {
+        const trimmedVerse = material.memory_verse.replace(/^memory verse:?\s*/i, '')
+        return (
+          <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 px-4 py-3">
+            <p style={{ fontSize: '0.65em' }} className="font-semibold text-indigo-300 uppercase tracking-widest mb-1">
+              Memory Verse
+            </p>
+            <p style={{ fontSize: '0.75em' }} className="text-indigo-100 italic leading-relaxed">
+              {trimmedVerse}
+            </p>
+          </div>
+        )
+      })()}
 
       <p style={{ fontSize: '0.65em' }} className="text-center text-indigo-400">Drag corners or tap edges to turn pages →</p>
     </div>
@@ -525,7 +531,7 @@ function BackContent({ material }: { material: StudyMaterial }) {
   )
 }
 
-// ─── Main FlipBookViewer ──────────────────────────────────────────────────────
+// ─── Main FlipBookViewer ────────────────────────────────────────────────      
 
 export interface FlipBookViewerProps {
   slug: string
@@ -635,6 +641,8 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
   // ── Book ref ──
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bookRef = useRef<any>(null)
+  const shareCardRef = useRef<HTMLDivElement>(null)
+  const [isSharing, setIsSharing] = useState(false)
 
   // ── Mount guard (react-pageflip uses DOM APIs) ──
   useEffect(() => {
@@ -857,6 +865,40 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     window.location.reload()
   }
 
+  // ── Share as Image ──
+  const handleShare = async () => {
+    if (!shareCardRef.current || isSharing) return
+    setIsSharing(true)
+    try {
+      const blob = await toBlob(shareCardRef.current, {
+        cacheBust: true,
+        pixelRatio: 2
+      })
+      if (!blob) throw new Error('Failed to generate image')
+
+      const file = new File([blob], `${studyMaterial.slug}-share.png`, { type: 'image/png' })
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: studyMaterial.title,
+          files: [file]
+        })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${studyMaterial.slug}-share.png`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch (err) {
+      console.error('Error sharing:', err)
+      alert('Could not share the image.')
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
   // ── Render a page's inner content ──
   function renderPageContent(page: PageData): React.ReactNode {
     switch (page.kind) {
@@ -1041,6 +1083,19 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
         }}
       >
 
+        {/* Hidden Share Card for image generation */}
+        <div className="fixed -left-[9999px] -top-[9999px]">
+          <ShareCard
+            ref={shareCardRef}
+            title={studyMaterial.title}
+            slug={studyMaterial.slug}
+            date={new Date(studyMaterial.created_at).toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric', year: 'numeric'
+            })}
+            url={typeof window !== 'undefined' ? window.location.href : ''}
+          />
+        </div>
+
         {/* ── Top bar ── */}
         <header className={`flex-shrink-0 flex items-center justify-between px-4 py-2.5 backdrop-blur-sm border-b print:hidden ${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
           {/* Left: title */}
@@ -1093,6 +1148,20 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
                 className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 w-10 rounded-xl border text-base font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${isDark ? 'border-gray-700 text-gray-400 hover:bg-gray-800' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
               >
                 A<span className="text-[9px] align-super">+</span>
+              </button>
+
+              <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+
+              {/* Share */}
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={isSharing}
+                title="Share via WhatsApp"
+                className={`inline-flex flex-col items-center justify-center gap-0.5 h-10 px-3 rounded-xl border transition-colors ${isDark ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+              >
+                <Share2 className="h-4 w-4" />
+                <span className="text-[9px] font-medium leading-none">{isSharing ? '...' : 'Share'}</span>
               </button>
 
               <div className={`w-px h-8 mx-0.5 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
@@ -1226,6 +1295,17 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
               </button>
               {/* px label */}
               <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{fontSize}px</span>
+
+              {/* Share (Mobile) */}
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={isSharing}
+                className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${isDark ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                {isSharing ? 'Sharing...' : 'Share'}
+              </button>
 
               {/* Spacer */}
               <div className="flex-1" />
@@ -1435,6 +1515,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
             scriptureReference={modalSection.scripture_reference}
             summary={modalSection.summary}
             scriptureText={modalSection.scripture_text}
+            fontSize={fontSize}
             onClose={() => setModalSection(null)}
           />
         )}

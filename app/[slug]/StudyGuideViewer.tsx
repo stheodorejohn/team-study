@@ -416,10 +416,10 @@ export function StudyGuideViewer({ slug, studyMaterial }: StudyGuideViewerProps)
 
         {/* Memory verse callout */}
         {studyMaterial.memory_verse && (
-          <div className="mx-4 mb-2 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2">
+          <div className="bg-indigo-50 border-l-4 border-indigo-500 rounded-r-xl p-4 my-6">
             <p className="text-xs font-semibold text-indigo-600 mb-0.5">Memory Verse</p>
-            <p className="text-xs italic text-indigo-700 leading-relaxed">
-              {studyMaterial.memory_verse}
+            <p className="text-indigo-900 font-medium italic leading-relaxed">
+              {studyMaterial.memory_verse.replace(/^memory verse:?\s*/i, '')}
             </p>
           </div>
         )}
@@ -522,10 +522,10 @@ export function StudyGuideViewer({ slug, studyMaterial }: StudyGuideViewerProps)
             <p className="text-sm text-gray-500">{studyMaterial.organization}</p>
           )}
           {studyMaterial.memory_verse && (
-            <blockquote className="mt-3 border-l-4 border-indigo-400 pl-4 italic text-gray-700 text-sm">
+            <p className="mt-2 text-[10px] text-gray-700">
               <strong className="not-italic text-indigo-600">Memory Verse: </strong>
-              {studyMaterial.memory_verse}
-            </blockquote>
+              <span className="italic">{studyMaterial.memory_verse.replace(/^memory verse:?\s*/i, '')}</span>
+            </p>
           )}
         </div>
         {sections.map((section, idx) => (
