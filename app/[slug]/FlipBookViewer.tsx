@@ -315,19 +315,44 @@ function SectionHeaderContent({
 // ─── Auto-expanding textarea ──────────────────────────────────────────────────
 
 function AutoTextarea({
-  value,
+  defaultValue,
   placeholder,
   onChange,
+  onFocus,
   className,
   autoFocus,
 }: {
-  value: string
+  defaultValue: string
   placeholder: string
   onChange: (v: string) => void
+  onFocus?: () => void
   className: string
   autoFocus?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-focus and scroll into view when entering edit mode
+  useEffect(() => {
+    if (autoFocus && ref.current) {
+      ref.current.focus()
+      const len = ref.current.value.length
+      ref.current.setSelectionRange(len, len)
+      setTimeout(() => {
+        ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 50)
+    }
+  }, [autoFocus])
+
+  // Sync if defaultValue updates from external source (e.g. hydration)
+  useEffect(() => {
+    if (ref.current && defaultValue !== undefined) {
+      if (ref.current.value !== defaultValue) {
+        ref.current.value = defaultValue
+      }
+      ref.current.style.height = 'auto'
+      ref.current.style.height = `${ref.current.scrollHeight}px`
+    }
+  }, [defaultValue])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const el = e.target
@@ -336,24 +361,13 @@ function AutoTextarea({
     onChange(el.value)
   }
 
-  // Resize on value change & initial mount
-  useEffect(() => {
-    const el = ref.current
-    if (el) {
-      el.style.height = 'auto'
-      el.style.height = `${el.scrollHeight}px`
-      if (autoFocus) {
-        el.focus()
-      }
-    }
-  }, [value, autoFocus])
-
   return (
     <textarea
       ref={ref}
-      value={value}
+      defaultValue={defaultValue}
       placeholder={placeholder}
       rows={3}
+      onFocus={onFocus}
       onChange={handleChange}
       className={className}
       style={{ overflow: 'hidden', resize: 'none' }}
@@ -367,7 +381,10 @@ function QuestionInput({
   onStringAnswer,
   onCheckboxToggle,
   isEditing,
+  isAnyEditing,
   onStartEditing,
+  onSaveEditing,
+  onCancelEditing,
   isDark = false,
 }: {
   question: Question
@@ -375,25 +392,15 @@ function QuestionInput({
   onStringAnswer: (id: string, v: string) => void
   onCheckboxToggle: (id: string, opt: string, checked: boolean) => void
   isEditing?: boolean
+  isAnyEditing?: boolean
   onStartEditing?: (id: string) => void
+  onSaveEditing?: () => void
+  onCancelEditing?: () => void
   isDark?: boolean
 }) {
   const stringVal = typeof value === 'string' ? value : ''
   const arrayVal = Array.isArray(value) ? value : []
-
-  // font-size: max(16px, 1em) prevents iOS Safari from zooming in on focus when 1em < 16px,
-  // while still allowing the input to scale up with the page's font-size if A+ is clicked.
-  const base = isDark
-    ? `w-full rounded border px-2 py-1.5 text-[max(16px,1em)] text-gray-100 placeholder-gray-500 focus:outline-none transition ${
-        isEditing
-          ? 'border-indigo-500 ring-2 ring-indigo-500/40 bg-gray-800'
-          : 'border-gray-700 bg-gray-800'
-      }`
-    : `w-full rounded border px-2 py-1.5 text-[max(16px,1em)] text-gray-800 placeholder-gray-400 focus:outline-none transition ${
-        isEditing
-          ? 'border-indigo-500 ring-2 ring-indigo-500/40 bg-indigo-50/20'
-          : 'border-gray-200 bg-gray-50'
-      }`
+  const hasAnswer = question.type === 'checkbox' ? arrayVal.length > 0 : Boolean(stringVal.trim())
 
   // Attach native listeners to stop propagation at DOM level before page-flip gets it.
   const containerNodeRef = useRef<HTMLDivElement | null>(null)
@@ -417,77 +424,271 @@ function QuestionInput({
   }, [])
 
   return (
-    <div className={`space-y-1.5 p-2 rounded-xl transition-all ${isEditing ? (isDark ? 'bg-indigo-950/30 border border-indigo-800/60' : 'bg-indigo-50/60 border border-indigo-200') : ''}`}>
-      <div className="flex items-start justify-between gap-2">
-        <label style={{ fontSize: '0.9em' }} className={`block font-medium leading-snug flex-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+    <div
+      className={`rounded-2xl transition-all duration-200 ${
+        isEditing
+          ? isDark
+            ? 'bg-gray-800/90 border-2 border-indigo-500 shadow-xl ring-4 ring-indigo-500/20 p-4'
+            : 'bg-white border-2 border-indigo-500 shadow-xl shadow-indigo-500/10 ring-4 ring-indigo-500/10 p-4'
+          : isAnyEditing
+            ? 'opacity-40 p-3 rounded-xl border border-transparent'
+            : isDark
+              ? 'hover:bg-gray-800/50 p-3 rounded-xl border border-gray-800/60'
+              : 'hover:bg-gray-50/80 p-3 rounded-xl border border-gray-100'
+      }`}
+    >
+      {/* Header: Prompt and Action Badge */}
+      <div className="flex items-start justify-between gap-3 mb-2.5">
+        <label
+          style={{ fontSize: '0.9em' }}
+          className={`block font-semibold leading-snug flex-1 ${
+            isEditing
+              ? isDark ? 'text-indigo-200' : 'text-indigo-950 font-bold'
+              : isDark ? 'text-gray-200' : 'text-gray-800'
+          }`}
+        >
           {question.prompt}
-          {question.is_required && <span className="text-red-400 ml-0.5">*</span>}
+          {question.is_required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
-        {onStartEditing && (
-          <button
-            type="button"
-            onClick={() => onStartEditing(question.id)}
-            aria-label={`Edit answer: ${question.prompt}`}
-            className={`p-1 rounded-md transition-colors flex-shrink-0 ${
-              isEditing
-                ? 'bg-indigo-600 text-white'
-                : isDark
-                  ? 'text-gray-400 hover:text-indigo-400 hover:bg-gray-800'
-                  : 'text-gray-400 hover:text-indigo-600 hover:bg-gray-100'
-            }`}
-            title="Edit answer"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
+
+        {isEditing ? (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-600 text-white shadow-sm shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+            Editing
+          </span>
+        ) : (
+          onStartEditing && (
+            <button
+              type="button"
+              onClick={() => onStartEditing(question.id)}
+              aria-label={`Edit answer: ${question.prompt}`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 ${
+                hasAnswer
+                  ? isDark
+                    ? 'text-gray-400 hover:text-indigo-400 hover:bg-gray-800 border border-gray-700'
+                    : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50/70 border border-gray-200 bg-white shadow-xs'
+                  : isDark
+                    ? 'text-indigo-400 hover:bg-indigo-950/50 border border-indigo-800/60'
+                    : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200 bg-indigo-50/40'
+              }`}
+            >
+              <Pencil className="h-3 w-3" />
+              <span>{hasAnswer ? 'Edit' : 'Answer'}</span>
+            </button>
+          )
         )}
       </div>
 
+      {/* Body: Inputs or Display */}
       <div
         ref={setContainerRef}
         style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
       >
-        {(question.type === 'text' || question.type === 'textarea') && (
-          <AutoTextarea
-            value={stringVal}
-            placeholder="Thoughts…"
-            onChange={(v) => onStringAnswer(question.id, v)}
-            className={`${base} min-h-[72px]`}
-            autoFocus={isEditing}
-          />
+        {(question.type === 'text' || question.type === 'textarea' || !question.type) && (
+          isEditing ? (
+            <div className="space-y-3">
+              <AutoTextarea
+                defaultValue={stringVal}
+                placeholder="Type your response here…"
+                onChange={(v) => onStringAnswer(question.id, v)}
+                className={`w-full rounded-xl border-2 px-3 py-2 text-[max(16px,1em)] placeholder-gray-400 focus:outline-none transition min-h-[96px] shadow-inner ${
+                  isDark
+                    ? 'border-indigo-500/80 bg-gray-900 text-gray-100 ring-2 ring-indigo-500/30'
+                    : 'border-indigo-500 bg-white text-gray-900 ring-2 ring-indigo-500/20'
+                }`}
+                autoFocus={true}
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/50">
+                <p className="text-[11px] text-gray-400 dark:text-gray-400 italic">
+                  Page turning is paused while typing
+                </p>
+                <div className="flex items-center gap-2">
+                  {onCancelEditing && (
+                    <button
+                      type="button"
+                      onClick={onCancelEditing}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                        isDark
+                          ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 shadow-sm'
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  {onSaveEditing && (
+                    <button
+                      type="button"
+                      onClick={onSaveEditing}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm active:scale-95 transition"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Save Answer
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : hasAnswer ? (
+            <div
+              onClick={() => onStartEditing?.(question.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') onStartEditing?.(question.id)
+              }}
+              className={`group relative rounded-xl border p-3 cursor-pointer transition-all ${
+                isDark
+                  ? 'bg-gray-900/60 border-gray-800 hover:border-indigo-600/60 hover:bg-gray-800/80 text-gray-200'
+                  : 'bg-slate-50/80 border-slate-200/80 hover:border-indigo-300 hover:bg-white text-gray-800 shadow-xs'
+              }`}
+              title="Click to edit this answer"
+            >
+              <p className="text-[max(14px,0.92em)] whitespace-pre-wrap break-words leading-relaxed font-normal">
+                {stringVal}
+              </p>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-gray-400 group-hover:text-indigo-500 transition-colors">
+                <span className="flex items-center gap-1 font-medium">
+                  <Check className="h-3 w-3 text-emerald-500" /> Saved
+                </span>
+                <span className="italic opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                  Click to edit <ChevronRight className="h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onStartEditing?.(question.id)}
+              className={`w-full text-left rounded-xl border-2 border-dashed p-3.5 transition-all group flex items-center justify-between ${
+                isDark
+                  ? 'border-gray-800 bg-gray-900/30 hover:border-indigo-500/50 hover:bg-gray-900/60'
+                  : 'border-gray-200 bg-slate-50/40 hover:border-indigo-400 hover:bg-indigo-50/20'
+              }`}
+            >
+              <span className={`text-xs italic ${isDark ? 'text-gray-500 group-hover:text-gray-300' : 'text-gray-400 group-hover:text-indigo-600'}`}>
+                Write your response here…
+              </span>
+              <span className={`inline-flex items-center gap-1 text-xs font-semibold ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                <Pencil className="h-3 w-3" />
+                Add answer
+              </span>
+            </button>
+          )
         )}
 
         {question.type === 'radio' && (
-          <div className="space-y-1">
-            {(question.options ?? []).map((opt, i) => (
-              <label key={i} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`q-${question.id}`}
-                  value={opt}
-                  checked={stringVal === opt}
-                  onChange={() => onStringAnswer(question.id, opt)}
-                  className="h-3 w-3 text-indigo-600"
-                />
-                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{opt}</span>
-              </label>
-            ))}
+          <div className="space-y-1.5 pt-1">
+            {(question.options ?? []).map((opt, i) => {
+              const isSelected = stringVal === opt
+              return (
+                <label
+                  key={i}
+                  className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition ${
+                    isSelected
+                      ? isDark
+                        ? 'bg-indigo-950/60 border border-indigo-700 text-white'
+                        : 'bg-indigo-50 border border-indigo-300 text-indigo-900 font-medium'
+                      : isDark
+                        ? 'hover:bg-gray-800/80 text-gray-300 border border-transparent'
+                        : 'hover:bg-gray-50 text-gray-700 border border-transparent'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`q-${question.id}`}
+                    value={opt}
+                    checked={isSelected}
+                    onChange={() => {
+                      onStringAnswer(question.id, opt)
+                      if (!isEditing) onStartEditing?.(question.id)
+                    }}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs flex-1">{opt}</span>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600 shrink-0" />}
+                </label>
+              )
+            })}
+            {isEditing && (
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/50">
+                {onCancelEditing && (
+                  <button
+                    type="button"
+                    onClick={onCancelEditing}
+                    className="px-3 py-1 text-xs font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                )}
+                {onSaveEditing && (
+                  <button
+                    type="button"
+                    onClick={onSaveEditing}
+                    className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white"
+                  >
+                    <Check className="h-3 w-3" /> Save
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {question.type === 'checkbox' && (
-          <div className="space-y-1">
-            {(question.options ?? []).map((opt, i) => (
-              <label key={i} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  value={opt}
-                  checked={arrayVal.includes(opt)}
-                  onChange={(e) => onCheckboxToggle(question.id, opt, e.target.checked)}
-                  className="h-3 w-3 rounded text-indigo-600"
-                />
-                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{opt}</span>
-              </label>
-            ))}
+          <div className="space-y-1.5 pt-1">
+            {(question.options ?? []).map((opt, i) => {
+              const isSelected = arrayVal.includes(opt)
+              return (
+                <label
+                  key={i}
+                  className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition ${
+                    isSelected
+                      ? isDark
+                        ? 'bg-indigo-950/60 border border-indigo-700 text-white'
+                        : 'bg-indigo-50 border border-indigo-300 text-indigo-900 font-medium'
+                      : isDark
+                        ? 'hover:bg-gray-800/80 text-gray-300 border border-transparent'
+                        : 'hover:bg-gray-50 text-gray-700 border border-transparent'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    value={opt}
+                    checked={isSelected}
+                    onChange={(e) => {
+                      onCheckboxToggle(question.id, opt, e.target.checked)
+                      if (!isEditing) onStartEditing?.(question.id)
+                    }}
+                    className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs flex-1">{opt}</span>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600 shrink-0" />}
+                </label>
+              )
+            })}
+            {isEditing && (
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/50">
+                {onCancelEditing && (
+                  <button
+                    type="button"
+                    onClick={onCancelEditing}
+                    className="px-3 py-1 text-xs font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                )}
+                {onSaveEditing && (
+                  <button
+                    type="button"
+                    onClick={onSaveEditing}
+                    className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white"
+                  >
+                    <Check className="h-3 w-3" /> Save
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -504,6 +705,8 @@ function QuestionsPageContent({
   answers,
   editingQuestionId,
   onStartEditing,
+  onSaveEditing,
+  onCancelEditing,
   onStringAnswer,
   onCheckboxToggle,
   isDark = false,
@@ -516,6 +719,8 @@ function QuestionsPageContent({
   answers: AnswerMap
   editingQuestionId: string | null
   onStartEditing: (id: string) => void
+  onSaveEditing: () => void
+  onCancelEditing: () => void
   onStringAnswer: (id: string, v: string) => void
   onCheckboxToggle: (id: string, opt: string, checked: boolean) => void
   isDark?: boolean
@@ -532,7 +737,7 @@ function QuestionsPageContent({
   }, [])
 
   return (
-    <div ref={questionsScrollRef} className="flex flex-col px-5 py-4 pb-12">
+    <div ref={questionsScrollRef} className="flex flex-col px-5 py-4 pb-48">
       {/* Mini section header (scrolls with page) */}
       <div className={`flex flex-wrap items-start gap-x-2 gap-y-0.5 mb-3 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-100'}`}>
         <div className="h-2.5 w-2.5 rounded-full mt-0.5 shrink-0" style={{ background: color }} />
@@ -554,7 +759,10 @@ function QuestionsPageContent({
             question={q}
             value={answers[q.id]}
             isEditing={editingQuestionId === q.id}
+            isAnyEditing={Boolean(editingQuestionId)}
             onStartEditing={onStartEditing}
+            onSaveEditing={onSaveEditing}
+            onCancelEditing={onCancelEditing}
             onStringAnswer={onStringAnswer}
             onCheckboxToggle={onCheckboxToggle}
             isDark={isDark}
@@ -646,6 +854,21 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     () => studyMaterial.study_sections.flatMap((s) => s.questions),
     [studyMaterial]
   )
+  const activeQuestion = useMemo(
+    () => (editingQuestionId ? allQuestions.find((q) => q.id === editingQuestionId) : null),
+    [editingQuestionId, allQuestions]
+  )
+  const activeQuestionIndex = useMemo(
+    () => (editingQuestionId ? allQuestions.findIndex((q) => q.id === editingQuestionId) : -1),
+    [editingQuestionId, allQuestions]
+  )
+  const activeQuestionLabel = useMemo(() => {
+    if (!activeQuestion) return 'Question'
+    const match = activeQuestion.prompt.match(/^(\d+)\./)
+    if (match) return `Question ${match[1]}`
+    if (activeQuestionIndex >= 0) return `Question ${activeQuestionIndex + 1}`
+    return 'Question'
+  }, [activeQuestion, activeQuestionIndex])
   // Stable primitive key so the useEffect dep array never changes size.
   // React requires hook dep arrays to have a constant length between renders;
   // spreading an array of questions would violate that rule.
@@ -830,87 +1053,50 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
 
   // Debounced persistence helper
   const pendingSaveRef = useRef<NodeJS.Timeout | null>(null)
-  const scheduleSave = useCallback(
-    (newAnswers: AnswerMap) => {
-      if (pendingSaveRef.current) clearTimeout(pendingSaveRef.current)
-      pendingSaveRef.current = setTimeout(() => {
-        saveGuideAnswersBatch(slug, newAnswers).catch(() => {})
-      }, 300)
-    },
-    [slug]
-  )
+  const scheduleSave = useCallback(() => {
+    if (pendingSaveRef.current) clearTimeout(pendingSaveRef.current)
+    pendingSaveRef.current = setTimeout(() => {
+      saveGuideAnswersBatch(slug, answersRef.current).catch(() => {})
+    }, 400)
+  }, [slug])
 
   // ── Answer handlers ──
   const handleStringAnswer = useCallback(
     (id: string, value: string) => {
       answersRef.current[id] = value
-      setAnswers((prev) => {
-        const next = { ...prev, [id]: value }
-        scheduleSave(next)
-        return next
-      })
+      scheduleSave()
     },
     [scheduleSave]
   )
 
   const handleCheckboxToggle = useCallback(
     (id: string, option: string, checked: boolean) => {
-      setAnswers((prev) => {
-        const current = (prev[id] as string[]) ?? []
-        const nextList = checked
-          ? [...current, option]
-          : current.filter((v) => v !== option)
-        const next = { ...prev, [id]: nextList }
-        answersRef.current = next
-        scheduleSave(next)
-        return next
-      })
+      const current = (answersRef.current[id] as string[]) ?? []
+      const nextList = checked
+        ? [...current, option]
+        : current.filter((v) => v !== option)
+      answersRef.current[id] = nextList
+      scheduleSave()
     },
     [scheduleSave]
   )
 
-  // ── Edit Mode Navigation & Save Island ──
-  const allQuestionIds = useMemo(() => allQuestions.map((q) => q.id), [allQuestions])
-  const currentEditIndex = editingQuestionId ? allQuestionIds.indexOf(editingQuestionId) : -1
-  const hasPrevQuestion = currentEditIndex > 0
-  const hasNextQuestion = currentEditIndex >= 0 && currentEditIndex < allQuestionIds.length - 1
-
-  const handleEditPrev = useCallback(() => {
-    if (hasPrevQuestion) {
-      const prevId = allQuestionIds[currentEditIndex - 1]
-      setEditingQuestionId(prevId)
-      const targetPageIdx = pages.findIndex(
-        (p) => p.kind === 'questions' && p.questions.some((q) => q.id === prevId)
-      )
-      if (targetPageIdx !== -1 && targetPageIdx !== currentPage) {
-        bookRef.current?.pageFlip()?.turnToPage(targetPageIdx)
-      }
-    }
-  }, [allQuestionIds, currentEditIndex, hasPrevQuestion, pages, currentPage])
-
-  const handleEditNext = useCallback(() => {
-    if (hasNextQuestion) {
-      const nextId = allQuestionIds[currentEditIndex + 1]
-      setEditingQuestionId(nextId)
-      const targetPageIdx = pages.findIndex(
-        (p) => p.kind === 'questions' && p.questions.some((q) => q.id === nextId)
-      )
-      if (targetPageIdx !== -1 && targetPageIdx !== currentPage) {
-        bookRef.current?.pageFlip()?.turnToPage(targetPageIdx)
-      }
-    }
-  }, [allQuestionIds, currentEditIndex, hasNextQuestion, pages, currentPage])
-
+  // ── Edit Mode Save / Cancel ──
   const handleEditSave = useCallback(() => {
-    saveGuideAnswersBatch(slug, answers).catch(() => {})
+    saveGuideAnswersBatch(slug, answersRef.current).catch(() => {})
+    setAnswers({ ...answersRef.current })
     setEditingQuestionId(null)
     setSaveNotice('Saved on this device')
     setTimeout(() => setSaveNotice(null), 2500)
-  }, [slug, answers])
+  }, [slug])
 
-  const handleEditClose = useCallback(() => {
+  const handleEditCancel = useCallback(() => {
+    if (editingQuestionId) {
+      answersRef.current[editingQuestionId] = answers[editingQuestionId]
+      setAnswers((prev) => ({ ...prev }))
+    }
     setEditingQuestionId(null)
-  }, [])
+  }, [editingQuestionId, answers])
 
   // ── Font size ──
   const MIN_FONT = 10
@@ -1062,6 +1248,8 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
             answers={answers}
             editingQuestionId={editingQuestionId}
             onStartEditing={setEditingQuestionId}
+            onSaveEditing={handleEditSave}
+            onCancelEditing={handleEditCancel}
             onStringAnswer={handleStringAnswer}
             onCheckboxToggle={handleCheckboxToggle}
             isDark={isDark}
@@ -1647,60 +1835,54 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
       {/* ── Edit Mode Floating Action Island ── */}
       {editingQuestionId && (
         <div
-          className="fixed bottom-16 sm:bottom-6 inset-x-0 mx-auto max-w-sm z-50 px-4"
+          className="fixed bottom-16 sm:bottom-6 inset-x-0 mx-auto max-w-lg z-50 px-4 pointer-events-none"
           role="region"
           aria-label="Answer editing controls"
         >
-          <div className={`flex items-center justify-between gap-2 px-4 py-2.5 rounded-2xl shadow-2xl border backdrop-blur-md ${
-            isDark ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200 text-gray-900'
+          <div className={`pointer-events-auto flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl shadow-2xl border backdrop-blur-md ${
+            isDark
+              ? 'bg-gray-900/95 border-gray-700 text-gray-100 shadow-black/50'
+              : 'bg-white/95 border-indigo-100 text-gray-900 shadow-indigo-900/10'
           }`}>
-            <button
-              type="button"
-              onClick={handleEditPrev}
-              disabled={!hasPrevQuestion}
-              aria-label="Previous question"
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition ${
-                isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Prev
-            </button>
+            {/* Polite message explaining edit state & paused page turn animation */}
+            <div className="flex items-center gap-2.5 text-xs min-w-0">
+              <span className="flex h-2.5 w-2.5 relative shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600"></span>
+              </span>
+              <div className="truncate text-xs">
+                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                  Editing {activeQuestionLabel}
+                </span>
+                <span className="mx-1.5 opacity-40">·</span>
+                <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                  Page turning paused so you can type
+                </span>
+              </div>
+            </div>
 
-            <div className="flex items-center gap-2">
+            {/* Actions: Cancel & Save */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleEditCancel}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+                  isDark
+                    ? 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 onClick={handleEditSave}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 active:scale-95 transition"
               >
                 <Check className="h-3.5 w-3.5" />
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={handleEditClose}
-                aria-label="Close edit mode"
-                className={`p-1.5 rounded-lg transition ${
-                  isDark ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                }`}
-                title="Close edit mode"
-              >
-                <X className="h-4 w-4" />
+                Save Answer
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={handleEditNext}
-              disabled={!hasNextQuestion}
-              aria-label="Next question"
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition ${
-                isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </div>
         </div>
       )}

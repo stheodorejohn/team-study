@@ -1,5 +1,29 @@
 # AI Change Log
 
+## 2026-11-10 — Overhaul Edit Mode UI and Question Affordance in FlipBookViewer
+- **Intuitive Question Card States:**
+  - **Active Editing State:** Distinct 2px indigo border (`border-2 border-indigo-500`), subtle ring (`ring-4 ring-indigo-500/10`), elevation shadow, active `[ ● Editing ]` pill with pulsing dot, and high-contrast focused textarea.
+  - **Inline Action Buttons:** Placed `Cancel` and `Save Answer` buttons directly beneath the active textarea so participants can save immediately without searching across the screen.
+  - **Answered Preview State:** Completed answers now render as clean formatted workbook entries with `✓ Saved` status, `Click to edit →`, and an explicit `[✏️ Edit]` button.
+  - **Empty Unanswered State:** Unanswered prompts display an inviting dashed placeholder with an explicit `[✏️ Add answer]` button.
+  - **Focus Isolation:** Non-active questions gently dim (`opacity-40`) while another question is in edit mode.
+- **Fixed Floating Island Overlap & Hierarchy:**
+  - Increased bottom scroll padding from `pb-12` (48px) to `pb-48` (192px) in `QuestionsPageContent`, ensuring the bottom-most question can scroll completely above the floating island with no obstruction.
+  - Streamlined floating island into a sleek, single-line dock displaying the exact question being edited: `Editing Question {N} · Page turning paused so you can type`, along with `Cancel` and `Save Answer`.
+  - Added `pointer-events-none` on outer wrapper to allow taps outside the dock to pass cleanly through to the page.
+- **Validation:**
+  - Passed `pnpm exec tsc --noEmit` (0 errors).
+  - Passed `pnpm lint` (0 errors).
+  - Passed `pnpm build` (all static & dynamic routes compiled cleanly).
+
+## 2026-11-10 — Fix edit mode typing visibility in FlipBookViewer
+- Fixed issue where typing in `AutoTextarea` was not visible:
+  - `HTMLFlipBook` has `renderOnlyPageLengthChange={true}` which prevented new child props from propagating when state changed on keystroke, causing controlled inputs to be reset back to empty strings.
+  - Converted `AutoTextarea` to an uncontrolled textarea using `defaultValue` with native DOM change management and external sync on hydration.
+  - Updated `handleStringAnswer` and `handleCheckboxToggle` to store keystrokes immediately in `answersRef.current` with debounced IndexedDB persistence, avoiding full flipbook re-renders on every keystroke.
+  - Added auto-scroll into view when entering edit mode and added `onFocus` trigger on textareas.
+  - Verified `pnpm exec tsc --noEmit` (0 errors), `pnpm lint` (0 errors), and `pnpm build` (clean build).
+
 ## 2026-11-10 — Remediation of audit findings (P0 - P4)
 - **P0 Security:**
   - Implemented `lib/auth.ts` providing cryptographic HMAC-SHA256 signed HttpOnly cookie sessions and Supabase SSR auth verification (`verifyAdminSession`).
