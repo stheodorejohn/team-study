@@ -1,7 +1,7 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase'
+import { verifyAdminSession } from '@/lib/auth'
 import { GuideFlipbook } from './GuideFlipbook'
 import { PlusCircle } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -14,14 +14,10 @@ export const metadata: Metadata = {
   description: 'Manage your study guides.',
 }
 
-const AUTH_COOKIE_NAME = 'auth_token'
-const AUTH_COOKIE_VALUE = 'admin_active'
-
 export default async function AdminDashboardPage() {
   // Auth guard
-  const cookieStore = await cookies()
-  const token = cookieStore.get(AUTH_COOKIE_NAME)
-  if (!token || token.value !== AUTH_COOKIE_VALUE) {
+  const isAuthenticated = await verifyAdminSession()
+  if (!isAuthenticated) {
     redirect('/login')
   }
 

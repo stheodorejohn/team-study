@@ -4,31 +4,40 @@ import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
 /**
- * /login – mock admin login page.
- *
- * Lives OUTSIDE /admin so the admin layout's cookie check never wraps it
- * (which would cause an infinite redirect loop).
- *
- * On success: sets the `auth_token` cookie client-side, then pushes to /admin.
+ * /login – secure admin login page.
+ * Authenticates via /api/auth/login and receives an HttpOnly signed cookie session.
  */
 export default function LoginPage() {
   const router = useRouter()
-  const [username, setUsername] = useState('')
+  const [identity, setIdentity] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    if (username === 'admin' && password === 'admin123') {
-      const expires = new Date(Date.now() + 8 * 60 * 60 * 1000).toUTCString()
-      document.cookie = `auth_token=admin_active; path=/; expires=${expires}; SameSite=Lax`
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: identity, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Authentication failed.')
+        setLoading(false)
+        return
+      }
+
       router.push('/admin')
-    } else {
-      setError('Invalid username or password.')
+      router.refresh()
+    } catch {
+      setError('Unable to sign in. Please check network connection.')
       setLoading(false)
     }
   }
@@ -74,18 +83,18 @@ export default function LoginPage() {
           )}
 
           <div className="space-y-1">
-            <label htmlFor="username" className="block text-xs font-medium text-gray-400">
-              Username
+            <label htmlFor="identity" className="block text-xs font-medium text-gray-400">
+              Username or Email
             </label>
             <input
-              id="username"
+              id="identity"
               type="text"
               autoComplete="username"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={identity}
+              onChange={(e) => setIdentity(e.target.value)}
               className="w-full rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              placeholder="admin"
+              placeholder="admin or email"
             />
           </div>
 
@@ -101,23 +110,17 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              placeholder="••••••••"
             />
           </div>
 
           <button
-            id="login-submit"
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed px-4 py-2.5 text-sm font-semibold text-white transition-colors"
+            className="w-full mt-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors py-2 px-4 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
-
-        <p className="text-center text-xs text-gray-600 mt-4">
-          Development credentials: admin / admin123
-        </p>
       </div>
     </div>
   )

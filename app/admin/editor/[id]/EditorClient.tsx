@@ -15,7 +15,7 @@
  *              with read-only rendered questions
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { QRCodeCanvas } from 'qrcode.react'
 import {
@@ -287,7 +287,7 @@ function SectionPreview({ section }: { section: DraftSection }) {
 
 export function EditorClient({ id, isNew, initialData }: EditorClientProps) {
   const router = useRouter()
-  const slugEdited = useRef(false)
+  const slugEdited = useRef(Boolean(initialData))
 
   const [draft, setDraft] = useState<DraftMaterial>(
     initialData ? materialToDraft(initialData) : emptyMaterial()
@@ -296,19 +296,11 @@ export function EditorClient({ id, isNew, initialData }: EditorClientProps) {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const [qrUrl, setQrUrl] = useState('')
   const [copied, setCopied] = useState(false)
 
-  if (initialData) slugEdited.current = true
-
-  // ── Derive QR URL ──
-  useEffect(() => {
-    if (draft.slug) {
-      setQrUrl(`${window.location.origin}/${draft.slug}`)
-    } else {
-      setQrUrl('')
-    }
-  }, [draft.slug])
+  // ── Derive QR URL safely without set-state-in-effect ──
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const qrUrl = draft.slug && origin ? `${origin}/${draft.slug}` : ''
 
   // ── Helpers: material-level ──
   function setField<K extends keyof DraftMaterial>(key: K, value: DraftMaterial[K]) {
@@ -450,8 +442,6 @@ export function EditorClient({ id, isNew, initialData }: EditorClientProps) {
     link.download = `${draft.slug || 'qr'}-qr.png`
     link.click()
   }
-
-  const activeSection = draft.sections[activeSectionIdx] ?? draft.sections[0]
 
   // ─────────────────────────────────────────────────────────────────────────
 

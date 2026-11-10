@@ -1,19 +1,20 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase'
 import type { StudyMaterial } from '@/lib/supabase'
 import { BookWrapper } from './BookWrapper'
 import type { Metadata } from 'next'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
-async function getStudyMaterial(slug: string): Promise<StudyMaterial | null> {
+export const getStudyMaterial = cache(async (slug: string): Promise<StudyMaterial | null> => {
   try {
     const client = createServiceClient()
     const { data, error } = await client
       .from('study_materials')
       .select('*, study_sections(*, questions(*))')
       .eq('slug', slug)
-      .single()
+      .maybeSingle()
 
     if (error || !data) return null
 
@@ -29,7 +30,7 @@ async function getStudyMaterial(slug: string): Promise<StudyMaterial | null> {
   } catch {
     return null
   }
-}
+})
 
 export async function generateMetadata({
   params,

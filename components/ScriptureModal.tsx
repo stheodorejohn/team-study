@@ -159,8 +159,8 @@ export function ScriptureModal({
   const translateY = (!isOpen || closing) ? '100%' : `${dragY}px`
 
   // Backdrop fades as drawer is dragged (proportional, max 60% opacity)
-  const drawerH      = drawerRef.current?.offsetHeight ?? 300
-  const dragFraction = Math.min(dragY / drawerH, 1)
+  const estimatedH   = 400
+  const dragFraction = Math.min(dragY / estimatedH, 1)
   const bgAlpha      = (!isOpen || closing ? 0 : 0.6 * (1 - dragFraction * 0.7)).toFixed(2)
 
   return (

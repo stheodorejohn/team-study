@@ -21,6 +21,7 @@ import React, {
   useRef,
   useCallback,
   useMemo,
+  useSyncExternalStore,
 } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import {
@@ -33,12 +34,15 @@ import {
   X,
   Settings,
   Share2,
+  Pencil,
+  Check,
   // Sun,
   // Moon,
 } from 'lucide-react'
 import { toBlob } from 'html-to-image'
 import type { StudyMaterial, StudySection, Question } from '@/lib/supabase'
 import { ScriptureModal } from '@/components/ScriptureModal'
+import { getGuideAnswers, saveGuideAnswersBatch, clearGuideAnswers } from '@/lib/studyDb'
 import { ShareCard } from './ShareCard'
 
 // ─── Answer state ─────────────────────────────────────────────────────────────
@@ -162,12 +166,14 @@ interface PageProps {
   totalPages?: number
   density?: 'hard' | 'soft'
   isDark?: boolean
+  onPageClick?: (e: React.MouseEvent<HTMLDivElement>) => void
 }
 
 const Page = forwardRef<HTMLDivElement, PageProps>(
-  ({ children, pageNum, totalPages, density = 'soft', isDark = false }, ref) => (
+  ({ children, pageNum, totalPages, density = 'soft', isDark = false, onPageClick }, ref) => (
     <div
       ref={ref}
+      onClick={onPageClick}
       data-density={density}
       className={`relative overflow-x-hidden overflow-y-auto touch-pan-y ${isDark ? 'bg-gray-900' : 'bg-white'}`}
       // overflow-x-hidden clips page content horizontally (prevents visual bleed),
@@ -309,15 +315,17 @@ function SectionHeaderContent({
 // ─── Auto-expanding textarea ──────────────────────────────────────────────────
 
 function AutoTextarea({
-  defaultValue,
+  value,
   placeholder,
   onChange,
-  className
+  className,
+  autoFocus,
 }: {
-  defaultValue: string
+  value: string
   placeholder: string
   onChange: (v: string) => void
   className: string
+  autoFocus?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -328,19 +336,22 @@ function AutoTextarea({
     onChange(el.value)
   }
 
-  // Initial resize
+  // Resize on value change & initial mount
   useEffect(() => {
     const el = ref.current
     if (el) {
       el.style.height = 'auto'
       el.style.height = `${el.scrollHeight}px`
+      if (autoFocus) {
+        el.focus()
+      }
     }
-  }, [])
+  }, [value, autoFocus])
 
   return (
     <textarea
       ref={ref}
-      defaultValue={defaultValue}
+      value={value}
       placeholder={placeholder}
       rows={3}
       onChange={handleChange}
@@ -352,29 +363,42 @@ function AutoTextarea({
 
 function QuestionInput({
   question,
-  answersRef,
+  value,
   onStringAnswer,
   onCheckboxToggle,
+  isEditing,
+  onStartEditing,
   isDark = false,
 }: {
   question: Question
-  answersRef: React.MutableRefObject<AnswerMap>
+  value: string | string[] | undefined
   onStringAnswer: (id: string, v: string) => void
   onCheckboxToggle: (id: string, opt: string, checked: boolean) => void
+  isEditing?: boolean
+  onStartEditing?: (id: string) => void
   isDark?: boolean
 }) {
+  const stringVal = typeof value === 'string' ? value : ''
+  const arrayVal = Array.isArray(value) ? value : []
+
   // font-size: max(16px, 1em) prevents iOS Safari from zooming in on focus when 1em < 16px,
   // while still allowing the input to scale up with the page's font-size if A+ is clicked.
   const base = isDark
-    ? 'w-full rounded border border-gray-700 bg-gray-800 px-2 py-1.5 text-[max(16px,1em)] text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition'
-    : 'w-full rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-[max(16px,1em)] text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 transition'
+    ? `w-full rounded border px-2 py-1.5 text-[max(16px,1em)] text-gray-100 placeholder-gray-500 focus:outline-none transition ${
+        isEditing
+          ? 'border-indigo-500 ring-2 ring-indigo-500/40 bg-gray-800'
+          : 'border-gray-700 bg-gray-800'
+      }`
+    : `w-full rounded border px-2 py-1.5 text-[max(16px,1em)] text-gray-800 placeholder-gray-400 focus:outline-none transition ${
+        isEditing
+          ? 'border-indigo-500 ring-2 ring-indigo-500/40 bg-indigo-50/20'
+          : 'border-gray-200 bg-gray-50'
+      }`
 
   // Attach native listeners to stop propagation at DOM level before page-flip gets it.
-  // 'touchmove' and 'wheel' are critical: without them the library intercepts vertical
-  // finger-scroll / mouse-wheel as a page-drag gesture, preventing the user from
-  // scrolling overflowing content when the font is large.
-  const inputContainerRef = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return
+  const containerNodeRef = useRef<HTMLDivElement | null>(null)
+  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+    const prev = containerNodeRef.current
     const stopNative = (e: Event) => e.stopPropagation()
     const events = [
       'mousedown', 'mouseup', 'click',
@@ -382,26 +406,53 @@ function QuestionInput({
       'pointerdown', 'pointerup',
       'wheel',
     ]
-    events.forEach((evt) => node.addEventListener(evt, stopNative, { passive: true }))
+
+    if (prev) {
+      events.forEach((evt) => prev.removeEventListener(evt, stopNative))
+    }
+    if (node) {
+      events.forEach((evt) => node.addEventListener(evt, stopNative, { passive: true }))
+    }
+    containerNodeRef.current = node
   }, [])
 
   return (
-    <div className="space-y-1">
-      <label style={{ fontSize: '0.9em' }} className={`block font-medium leading-snug ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-        {question.prompt}
-        {question.is_required && <span className="text-red-400 ml-0.5">*</span>}
-      </label>
+    <div className={`space-y-1.5 p-2 rounded-xl transition-all ${isEditing ? (isDark ? 'bg-indigo-950/30 border border-indigo-800/60' : 'bg-indigo-50/60 border border-indigo-200') : ''}`}>
+      <div className="flex items-start justify-between gap-2">
+        <label style={{ fontSize: '0.9em' }} className={`block font-medium leading-snug flex-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+          {question.prompt}
+          {question.is_required && <span className="text-red-400 ml-0.5">*</span>}
+        </label>
+        {onStartEditing && (
+          <button
+            type="button"
+            onClick={() => onStartEditing(question.id)}
+            aria-label={`Edit answer: ${question.prompt}`}
+            className={`p-1 rounded-md transition-colors flex-shrink-0 ${
+              isEditing
+                ? 'bg-indigo-600 text-white'
+                : isDark
+                  ? 'text-gray-400 hover:text-indigo-400 hover:bg-gray-800'
+                  : 'text-gray-400 hover:text-indigo-600 hover:bg-gray-100'
+            }`}
+            title="Edit answer"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
 
       <div
-        ref={inputContainerRef}
+        ref={setContainerRef}
         style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
       >
         {(question.type === 'text' || question.type === 'textarea') && (
           <AutoTextarea
-            defaultValue={(answersRef.current[question.id] as string) ?? ''}
+            value={stringVal}
             placeholder="Thoughts…"
             onChange={(v) => onStringAnswer(question.id, v)}
             className={`${base} min-h-[72px]`}
+            autoFocus={isEditing}
           />
         )}
 
@@ -413,7 +464,7 @@ function QuestionInput({
                   type="radio"
                   name={`q-${question.id}`}
                   value={opt}
-                  defaultChecked={(answersRef.current[question.id] as string) === opt}
+                  checked={stringVal === opt}
                   onChange={() => onStringAnswer(question.id, opt)}
                   className="h-3 w-3 text-indigo-600"
                 />
@@ -430,7 +481,7 @@ function QuestionInput({
                 <input
                   type="checkbox"
                   value={opt}
-                  defaultChecked={((answersRef.current[question.id] as string[]) ?? []).includes(opt)}
+                  checked={arrayVal.includes(opt)}
                   onChange={(e) => onCheckboxToggle(question.id, opt, e.target.checked)}
                   className="h-3 w-3 rounded text-indigo-600"
                 />
@@ -450,7 +501,9 @@ function QuestionsPageContent({
   questions,
   partNum,
   totalParts,
-  answersRef,
+  answers,
+  editingQuestionId,
+  onStartEditing,
   onStringAnswer,
   onCheckboxToggle,
   isDark = false,
@@ -460,15 +513,16 @@ function QuestionsPageContent({
   questions: Question[]
   partNum: number
   totalParts: number
-  answersRef: React.MutableRefObject<AnswerMap>
+  answers: AnswerMap
+  editingQuestionId: string | null
+  onStartEditing: (id: string) => void
   onStringAnswer: (id: string, v: string) => void
   onCheckboxToggle: (id: string, opt: string, checked: boolean) => void
   isDark?: boolean
 }) {
   const color = accent(sectionIdx)
 
-  // Attach native scroll-isolation to the questions container so that finger-scroll
-  // and wheel events within the list don't bubble up to the page-flip drag handler.
+  // Attach native scroll-isolation to the questions container
   const questionsScrollRef = useCallback((node: HTMLDivElement | null) => {
     if (!node) return
     const stop = (e: Event) => e.stopPropagation()
@@ -498,7 +552,9 @@ function QuestionsPageContent({
           <QuestionInput
             key={q.id}
             question={q}
-            answersRef={answersRef}
+            value={answers[q.id]}
+            isEditing={editingQuestionId === q.id}
+            onStartEditing={onStartEditing}
             onStringAnswer={onStringAnswer}
             onCheckboxToggle={onCheckboxToggle}
             isDark={isDark}
@@ -525,7 +581,7 @@ function BackContent({ material }: { material: StudyMaterial }) {
         )}
       </div>
       <p style={{ fontSize: '0.75em' }} className="text-indigo-400 italic leading-relaxed max-w-[200px]">
-        "Those who wait on the Lord shall renew their strength."
+        &ldquo;Those who wait on the Lord shall renew their strength.&rdquo;
       </p>
     </div>
   )
@@ -538,12 +594,18 @@ export interface FlipBookViewerProps {
   studyMaterial: StudyMaterial
 }
 
+const emptySubscribe = () => () => {}
+
 export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
   // ── State ──
   const [currentPage, setCurrentPage] = useState(0)
   const [fontSize, setFontSize] = useState(14)   // px, range 10–20
+  const [answers, setAnswers] = useState<AnswerMap>({})
   const answersRef = useRef<AnswerMap>({})
-  const [mounted, setMounted] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
+  const [saveNotice, setSaveNotice] = useState<string | null>(null)
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
   // ── Theme: read system preference, fall back to dark ──
   // const [isDark, setIsDark] = useState(() => {
@@ -568,18 +630,6 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
 
   // Track a stable layout height that doesn't shrink when virtual keyboard opens
   const [stableLayout, setStableLayout] = useState({ width: 0, height: 0 })
-
-  useEffect(() => {
-    setStableLayout((prev) => {
-      if (prev.width === 0) return { width: bookSize.width, height: bookSize.height }
-      // If width changed significantly (e.g. orientation change or window resize)
-      if (Math.abs(prev.width - bookSize.width) > 10) return { width: bookSize.width, height: bookSize.height }
-      // If height increased, update it
-      if (bookSize.height > prev.height) return { width: prev.width, height: bookSize.height }
-      // Otherwise keep old height to avoid reflow when keyboard pops up
-      return prev
-    })
-  }, [bookSize])
 
   // ── Responsive layout: 1-page vs 2-page spread ──
   // Show a two-page book spread when the device is in landscape AND wide enough
@@ -645,8 +695,6 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
 
   // ── Mount guard (react-pageflip uses DOM APIs) ──
   useEffect(() => {
-    setMounted(true)
-
     let rafId: number
     let attempts = 0
     function tryPatch() {
@@ -672,9 +720,14 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect
-      setBookSize({
-        width: Math.max(220, width),
-        height: Math.max(320, height),
+      const w = Math.max(220, width)
+      const h = Math.max(320, height)
+      setBookSize({ width: w, height: h })
+      setStableLayout((prev) => {
+        if (prev.width === 0) return { width: w, height: h }
+        if (Math.abs(prev.width - w) > 10) return { width: w, height: h }
+        if (h > prev.height) return { width: prev.width, height: h }
+        return prev
       })
     })
     ro.observe(el)
@@ -736,9 +789,6 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     }
 
     setQuestionsPerPage(Math.max(1, count))
-    // questionsKey is a stable string (joined IDs) — keeps the deps array at a
-    // constant size of 3, which React requires for hooks.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stableLayout.height, bookSize.height, fontSize, questionsKey])
 
   // The page-flip library calls `element.style.cssText = '...'` on every animation
@@ -761,37 +811,106 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     tag.textContent = `.stf__item { font-size: ${fontSize}px !important; background: ${bg} !important; }`
   }, [fontSize, isDark])
 
-  // ── Rehydrate answers from localStorage ──
+  // ── Rehydrate answers from IndexedDB (with automatic localStorage migration) ──
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey(slug))
-      if (raw) answersRef.current = JSON.parse(raw) as AnswerMap
-    } catch { /* ignore */ }
+    let active = true
+    getGuideAnswers(slug).then((saved) => {
+      if (active) {
+        if (saved && Object.keys(saved).length > 0) {
+          setAnswers(saved as AnswerMap)
+          answersRef.current = saved as AnswerMap
+        }
+        setIsHydrated(true)
+      }
+    })
+    return () => {
+      active = false
+    }
   }, [slug])
 
-  // Helper to persist without rendering
-  const saveAnswers = () => {
-    try {
-      localStorage.setItem(storageKey(slug), JSON.stringify(answersRef.current))
-    } catch { /* ignore */ }
-  }
-
-  // ── Answer handlers (Uncontrolled to prevent re-render) ──
-  const handleStringAnswer = useCallback((id: string, value: string) => {
-    answersRef.current[id] = value
-    saveAnswers()
-  }, [slug])
-
-  const handleCheckboxToggle = useCallback(
-    (id: string, option: string, checked: boolean) => {
-      const current = (answersRef.current[id] as string[]) ?? []
-      answersRef.current[id] = checked
-        ? [...current, option]
-        : current.filter((v) => v !== option)
-      saveAnswers()
+  // Debounced persistence helper
+  const pendingSaveRef = useRef<NodeJS.Timeout | null>(null)
+  const scheduleSave = useCallback(
+    (newAnswers: AnswerMap) => {
+      if (pendingSaveRef.current) clearTimeout(pendingSaveRef.current)
+      pendingSaveRef.current = setTimeout(() => {
+        saveGuideAnswersBatch(slug, newAnswers).catch(() => {})
+      }, 300)
     },
     [slug]
   )
+
+  // ── Answer handlers ──
+  const handleStringAnswer = useCallback(
+    (id: string, value: string) => {
+      answersRef.current[id] = value
+      setAnswers((prev) => {
+        const next = { ...prev, [id]: value }
+        scheduleSave(next)
+        return next
+      })
+    },
+    [scheduleSave]
+  )
+
+  const handleCheckboxToggle = useCallback(
+    (id: string, option: string, checked: boolean) => {
+      setAnswers((prev) => {
+        const current = (prev[id] as string[]) ?? []
+        const nextList = checked
+          ? [...current, option]
+          : current.filter((v) => v !== option)
+        const next = { ...prev, [id]: nextList }
+        answersRef.current = next
+        scheduleSave(next)
+        return next
+      })
+    },
+    [scheduleSave]
+  )
+
+  // ── Edit Mode Navigation & Save Island ──
+  const allQuestionIds = useMemo(() => allQuestions.map((q) => q.id), [allQuestions])
+  const currentEditIndex = editingQuestionId ? allQuestionIds.indexOf(editingQuestionId) : -1
+  const hasPrevQuestion = currentEditIndex > 0
+  const hasNextQuestion = currentEditIndex >= 0 && currentEditIndex < allQuestionIds.length - 1
+
+  const handleEditPrev = useCallback(() => {
+    if (hasPrevQuestion) {
+      const prevId = allQuestionIds[currentEditIndex - 1]
+      setEditingQuestionId(prevId)
+      const targetPageIdx = pages.findIndex(
+        (p) => p.kind === 'questions' && p.questions.some((q) => q.id === prevId)
+      )
+      if (targetPageIdx !== -1 && targetPageIdx !== currentPage) {
+        bookRef.current?.pageFlip()?.turnToPage(targetPageIdx)
+      }
+    }
+  }, [allQuestionIds, currentEditIndex, hasPrevQuestion, pages, currentPage])
+
+  const handleEditNext = useCallback(() => {
+    if (hasNextQuestion) {
+      const nextId = allQuestionIds[currentEditIndex + 1]
+      setEditingQuestionId(nextId)
+      const targetPageIdx = pages.findIndex(
+        (p) => p.kind === 'questions' && p.questions.some((q) => q.id === nextId)
+      )
+      if (targetPageIdx !== -1 && targetPageIdx !== currentPage) {
+        bookRef.current?.pageFlip()?.turnToPage(targetPageIdx)
+      }
+    }
+  }, [allQuestionIds, currentEditIndex, hasNextQuestion, pages, currentPage])
+
+  const handleEditSave = useCallback(() => {
+    saveGuideAnswersBatch(slug, answers).catch(() => {})
+    setEditingQuestionId(null)
+    setSaveNotice('Saved on this device')
+    setTimeout(() => setSaveNotice(null), 2500)
+  }, [slug, answers])
+
+  const handleEditClose = useCallback(() => {
+    setEditingQuestionId(null)
+  }, [])
 
   // ── Font size ──
   const MIN_FONT = 10
@@ -855,13 +974,32 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
     }
   }
 
+  const handlePageClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // When editing an answer, suspend page turn clicks
+    if (editingQuestionId) return
+
+    // Ignore if clicking on interactive elements
+    const target = e.target as HTMLElement
+    if (target.closest('button, input, textarea, a, label, .scripture-modal')) return
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+
+    // Use a wider touch area on mobile, 30% from edges
+    if (x < rect.width * 0.3) {
+      goPrev()
+    } else if (x > rect.width * 0.7) {
+      goNext()
+    }
+  }, [editingQuestionId])
+
   // ── Reset ──
   function openResetConfirm() { setResetConfirmOpen(true) }
   function doResetAnswers() {
     answersRef.current = {}
-    localStorage.removeItem(storageKey(slug))
+    setAnswers({})
+    clearGuideAnswers(slug).catch(() => {})
     setResetConfirmOpen(false)
-    window.location.reload()
   }
 
   // ── Share as Image ──
@@ -921,7 +1059,9 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
             questions={page.questions}
             partNum={page.partNum}
             totalParts={page.totalParts}
-            answersRef={answersRef}
+            answers={answers}
+            editingQuestionId={editingQuestionId}
+            onStartEditing={setEditingQuestionId}
             onStringAnswer={handleStringAnswer}
             onCheckboxToggle={handleCheckboxToggle}
             isDark={isDark}
@@ -1419,7 +1559,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
         className="relative flex-1 flex flex-col items-center justify-start overflow-hidden print:hidden p-[10px]"
       >
 
-        {mounted && pageWidth > 0 ? (
+        {mounted && isHydrated && pageWidth > 0 ? (
           <HTMLFlipBook
             key={`${pageWidth}-${bookSize.height}-${questionsPerPage}`}
             ref={bookRef}
@@ -1445,7 +1585,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
             startPage={0}
             startZIndex={0}
             autoSize={false}
-            swipeDistance={60}
+            swipeDistance={editingQuestionId ? 999999 : 60}
             renderOnlyPageLengthChange={true}
             onFlip={(e) => setCurrentPage(e.data)}
           >
@@ -1460,6 +1600,7 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
                   pageNum={showNum ? idx : undefined}
                   totalPages={totalPages}
                   isDark={isDark}
+                  onPageClick={handlePageClick}
                 >
                   {renderPageContent(page)}
                 </Page>
@@ -1502,6 +1643,79 @@ export function FlipBookViewer({ slug, studyMaterial }: FlipBookViewerProps) {
           <ChevronRight className="h-4 w-4" />
         </button>
       </nav>
+
+      {/* ── Edit Mode Floating Action Island ── */}
+      {editingQuestionId && (
+        <div
+          className="fixed bottom-16 sm:bottom-6 inset-x-0 mx-auto max-w-sm z-50 px-4"
+          role="region"
+          aria-label="Answer editing controls"
+        >
+          <div className={`flex items-center justify-between gap-2 px-4 py-2.5 rounded-2xl shadow-2xl border backdrop-blur-md ${
+            isDark ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200 text-gray-900'
+          }`}>
+            <button
+              type="button"
+              onClick={handleEditPrev}
+              disabled={!hasPrevQuestion}
+              aria-label="Previous question"
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition ${
+                isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Prev
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleEditSave}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 active:scale-95 transition"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={handleEditClose}
+                aria-label="Close edit mode"
+                className={`p-1.5 rounded-lg transition ${
+                  isDark ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                }`}
+                title="Close edit mode"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleEditNext}
+              disabled={!hasNextQuestion}
+              aria-label="Next question"
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition ${
+                isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Save status notification ── */}
+      {saveNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-xs font-medium px-4 py-2 rounded-full shadow-lg border border-gray-700 flex items-center gap-2"
+        >
+          <Check className="h-3.5 w-3.5 text-emerald-400" />
+          <span>{saveNotice}</span>
+        </div>
+      )}
 
 
       {/* Print layout is generated in a new window via handlePrint() — no in-DOM component needed */}

@@ -1,5 +1,7 @@
+import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase'
 import type { StudyMaterial } from '@/lib/supabase'
+import { verifyAdminSession } from '@/lib/auth'
 import { EditorClient } from './EditorClient'
 import type { Metadata } from 'next'
 
@@ -38,6 +40,11 @@ export default async function EditorPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  const isAuthenticated = await verifyAdminSession()
+  if (!isAuthenticated) {
+    redirect('/login')
+  }
+
   const { id } = await params
   const isNew = id === 'new'
   const initialData = isNew ? null : await getStudyMaterial(id)

@@ -299,12 +299,7 @@ function EmptyState() {
 export function GuideFlipbook({ guides }: GuideFlipbookProps) {
   const total = guides.length
   const [current, setCurrent] = useState(0)
-  const [origin, setOrigin] = useState('')
-
-  // Resolve origin client-side only
-  useEffect(() => {
-    setOrigin(window.location.origin)
-  }, [])
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
   // ── Keyboard navigation ──
   const goNext = useCallback(() => setCurrent((c) => Math.min(total - 1, c + 1)), [total])
@@ -334,7 +329,11 @@ export function GuideFlipbook({ guides }: GuideFlipbookProps) {
     const dx = e.changedTouches[0].clientX - touchX.current
     const dy = e.changedTouches[0].clientY - touchY.current
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-      dx < 0 ? goNext() : goPrev()
+      if (dx < 0) {
+        goNext()
+      } else {
+        goPrev()
+      }
     }
     touchX.current = null
     touchY.current = null

@@ -1,31 +1,15 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { verifyAdminSession } from '@/lib/auth'
 
-const ADMIN_COOKIE_NAME = 'auth_token'
-const ADMIN_TOKEN_VALUE = 'admin_active'
-
-/**
- * Admin layout.
- *
- * Reads the `auth_token` cookie from the request.  If it doesn't match the
- * expected value the user is redirected to /login.
- *
- * IMPORTANT: The login page lives at app/login/ (NOT app/admin/login/) so
- * this layout does NOT wrap it — that would cause an infinite redirect loop.
- *
- * NOTE: This is intentional mock auth for development.  Replace with a real
- * auth strategy (e.g. Supabase Auth + middleware) before deploying to
- * production.
- */
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(ADMIN_COOKIE_NAME)
+  const isAuthenticated = await verifyAdminSession()
 
-  if (!token || token.value !== ADMIN_TOKEN_VALUE) {
+  if (!isAuthenticated) {
     redirect('/login')
   }
 
@@ -34,11 +18,11 @@ export default async function AdminLayout({
       {/* Top navigation bar */}
       <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
-          <a
+          <Link
             href="/admin"
             className="flex items-center gap-2 font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
           >
-            {/* Book icon rendered with SVG so we don't need an extra import */}
+            {/* Book icon rendered with SVG */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-5 w-5"
@@ -55,21 +39,29 @@ export default async function AdminLayout({
               />
             </svg>
             Study Guide Architect
-          </a>
+          </Link>
 
           <nav className="flex items-center gap-4 text-sm">
-            <a
+            <Link
               href="/admin"
               className="text-gray-400 hover:text-gray-100 transition-colors"
             >
               Dashboard
-            </a>
-            <a
+            </Link>
+            <Link
               href="/admin/editor/new"
               className="rounded-md bg-indigo-600 px-3 py-1.5 text-white text-xs font-medium hover:bg-indigo-500 transition-colors"
             >
               + New Discussion
-            </a>
+            </Link>
+            <form action="/api/auth/logout" method="POST" className="inline">
+              <button
+                type="submit"
+                className="text-xs text-gray-500 hover:text-red-400 transition-colors px-2 py-1"
+              >
+                Sign out
+              </button>
+            </form>
           </nav>
         </div>
       </header>

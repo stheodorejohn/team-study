@@ -22,8 +22,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Printer, RotateCcw, BookOpen } from 'lucide-react'
-import type { StudyMaterial, StudySection, Question, QuestionType } from '@/lib/supabase'
+import type { StudyMaterial, StudySection, Question } from '@/lib/supabase'
 import { ScriptureModal } from '@/components/ScriptureModal'
+import { getGuideAnswers, saveGuideAnswersBatch, clearGuideAnswers } from '@/lib/studyDb'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -37,10 +38,6 @@ interface StudyGuideViewerProps {
 // Value = string (text / textarea / radio) | string[] (checkbox multi-select)
 
 type AnswerMap = Record<string, string | string[]>
-
-function storageKey(slug: string) {
-  return `study_answers_${slug}`
-}
 
 // ─── Auto-expanding textarea ──────────────────────────────────────────────────
 
@@ -282,7 +279,6 @@ export function StudyGuideViewer({ slug, studyMaterial }: StudyGuideViewerProps)
 
   const [currentSection, setCurrentSection] = useState(0)
   const [answers, setAnswers] = useState<AnswerMap>({})
-  console.log("currentSection", currentSection)
   // ── Scripture modal state ──
   type ModalState = { section: StudySection; trigger: HTMLButtonElement } | null
   const [activeModal, setActiveModal] = useState<ModalState>(null)
@@ -296,19 +292,26 @@ export function StudyGuideViewer({ slug, studyMaterial }: StudyGuideViewerProps)
     setActiveModal(null)
   }
 
-  // ── Rehydrate from localStorage on mount ──
+  // ── Rehydrate from IndexedDB (with legacy localStorage migration) ──
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey(slug))
-      if (raw) setAnswers(JSON.parse(raw) as AnswerMap)
-    } catch { /* corrupt storage — start fresh */ }
+    let active = true
+    getGuideAnswers(slug).then((saved) => {
+      if (active && saved && Object.keys(saved).length > 0) {
+        setAnswers(saved as AnswerMap)
+      }
+    })
+    return () => {
+      active = false
+    }
   }, [slug])
 
-  // ── Persist to localStorage on every change ──
+  // ── Debounced persist to IndexedDB on answers change ──
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey(slug), JSON.stringify(answers))
-    } catch { /* storage unavailable — silently ignore */ }
+    if (Object.keys(answers).length === 0) return
+    const timer = setTimeout(() => {
+      saveGuideAnswersBatch(slug, answers).catch(() => {})
+    }, 350)
+    return () => clearTimeout(timer)
   }, [slug, answers])
 
   // ── Answer handlers ──
@@ -368,7 +371,7 @@ export function StudyGuideViewer({ slug, studyMaterial }: StudyGuideViewerProps)
   function clearAnswers() {
     if (!window.confirm('Clear all your answers for this guide?')) return
     setAnswers({})
-    localStorage.removeItem(storageKey(slug))
+    clearGuideAnswers(slug).catch(() => {})
   }
 
   // ─────────────────────────────────────────────────────────────────────────
